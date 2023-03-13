@@ -1,21 +1,24 @@
-import { Socket } from "net";
+import http from "http"
+import { WebSocket } from "ws";
 
 export class UVClient {
-    socket: Socket
+    socket: WebSocket
     connections: Connection[]
 
-    constructor(socket: Socket) {
+    constructor(socket: WebSocket) {
         this.socket = socket
         this.connections = []
     }
 }
 
 export class Connection {
-    socket: Socket
+    req: http.ClientRequest
+    res: http.ServerResponse
     uvClient: UVClient
     
-    constructor(socket: Socket, uvClient: UVClient) {
-        this.socket = socket
+    constructor(req: http.ClientRequest, res: http.ServerResponse, uvClient: UVClient) {
+        this.req = req
+        this.res = res
         this.uvClient = uvClient
     }
 }
