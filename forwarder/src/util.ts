@@ -5,6 +5,14 @@ import { UpgradeErrorCode } from "./enums.js";
 import { UpgradeFailure } from "./structs.js";
 import { Socket } from "net";
 import { WebSocket } from "ws";
+import Logger from "./logger.js";
+import CIdentifyPacket from "./packets/identify/CIdentifyPacket.js";
+import { Protocol } from "./protocol.js";
+import { PROTO_VERSION } from "./meta.js";
+import SIdentifyFailurePacket, { IdentifyFailureReason } from "./packets/identify/SIdentifyFailurePacket.js";
+import { UVClient } from "./client.js";
+
+const logger = new Logger("ConnectionHandler")
 
 export namespace HTTPUtil {
     export async function route(req: http.IncomingMessage, res: http.ServerResponse) {
@@ -37,10 +45,26 @@ export namespace HTTPUtil {
                     socket.end()
                 } else {
                     if (WS.shouldHandle(req)) {
+                        let resolved = false
+                        setTimeout(() => {
+                            if (!resolved) {
+                                logger.warn(`Connection from [/${socket.remoteAddress}:${socket.remotePort}] timed out whilst authenticating!`)
+                                socket.end()
+                            }
+                        }, 30000)
                         const ws = await new Promise<WebSocket>(res => {
                             WS.handleUpgrade(req, socket, head, ws => res(ws))
                         })
-
+                        const Cidentify = new CIdentifyPacket().from((await Protocol.readPacket(ws))[2])
+                        if (Cidentify.protoVer! === PROTO_VERSION) {
+                            const uvClient = new UVClient(ws)
+                            
+                        } else {
+                            const SError = new SIdentifyFailurePacket()
+                            SError.reason = IdentifyFailureReason.BAD_VERSION
+                            Protocol.writePacket(ws, 0, SError)
+                            ws.close()
+                        }
                     } else {
                         socket.end()
                     }

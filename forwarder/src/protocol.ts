@@ -3,6 +3,7 @@ import varint from "varint"
 import * as msgpack from "msgpackr"
 import { Duplex } from "stream"
 import IPacket from "./IPacket.js"
+import { WebSocket } from "ws"
 
 // This file contains implementations of all
 // the basic datatypes of the Polly framework.
@@ -342,15 +343,15 @@ export namespace Protocol {
         }
     }
 
-    export function writePacket(socket: Duplex, connectionId: number, packet: IPacket) {
+    export function writePacket(socket: WebSocket, connectionId: number, packet: IPacket) {
         const body = Buffer.concat([Protocol.writeVarInt(connectionId), Protocol.writeVarInt(packet.id), packet.to()])
-        socket.write(Buffer.concat([
+        socket.send(Buffer.concat([
             Protocol.writeVarInt(body.length),
             body
         ]))
     }
 
-    export function readPacket(socket: Duplex): Promise<[number, number, Buffer]> {
+    export function readPacket(socket: WebSocket): Promise<[number, number, Buffer]> {
         return new Promise<[number, number, Buffer]>(async (res, rej) => {
             const length = await new Promise<number | never>((res, rej) => {
                 const disconCb = () => {

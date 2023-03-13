@@ -17,6 +17,6 @@ export default class SIdentifyFailurePacket implements IPacket {
     }
 }
 
-export enum LoginFailureReason {
-    BAD_PASSWORD = 0x00
+export enum IdentifyFailureReason {
+    BAD_VERSION = 0x00
 }
