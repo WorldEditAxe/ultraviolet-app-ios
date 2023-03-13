@@ -1,7 +1,7 @@
 import IPacket from "../../IPacket.js";
 import { Protocol } from "../../protocol.js";
 
-export default class SIdentifyPacket implements IPacket {
+export default class SIdentifySuccessPacket implements IPacket {
     id: number = 0x00
     boundTo: "CLIENT" | "SERVER" = "SERVER"
 

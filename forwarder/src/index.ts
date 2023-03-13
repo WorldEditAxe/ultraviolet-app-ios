@@ -3,9 +3,11 @@ import config from "./config.js"
 import http from "http"
 import https from "https"
 import { HTTPUtil } from "./util.js";
+import { WebSocketServer } from "ws";
 
 const logger = new Logger("Forwarder")
-let server: http.Server
+let server: http.Server,
+    wsServer: WebSocketServer
 
 logger.info("Starting Forwarder...")
 logger.info("<--- CONFIG --->")
@@ -29,6 +31,11 @@ if (!config.tls.key || !config.tls.cert) {
     server = https.createServer({
         key: config.tls.key,
         cert: config.tls.cert
+    }, async (req, res) => {
+        try { await HTTPUtil.route(req, res) }
+        catch (err) {
+            logger.warn(`Failed to handle HTTP request from [/${req.socket.remoteAddress}:${req.socket.remotePort}]!\n${(err as any).stack || err}`)
+        }
     }).listen(config.bindPort, config.bindIp)
 }
 const errBindListener = (err: Error) => {
@@ -38,6 +45,20 @@ const errBindListener = (err: Error) => {
 
 server.once('error', errBindListener)
 server.on('listening', () => {
+    wsServer = new WebSocketServer({ noServer: true })
+    global.SERVER = server
+    global.WS = wsServer
+    global.CONFIG = config
+    global.BACKEND = null
+
     server.removeListener('error', errBindListener)
+    WS.on('error', err => {
+        logger.warn(`WebSocket server threw an error: ${err.stack || err}`)
+    })
+    SERVER.on('error', err => {
+        logger.warn(`HTTP server threw an error: ${err.stack || err}`)
+    })
+    SERVER.on('upgrade', HTTPUtil.handleUpgrade)
+
     logger.info(`Server successfully binded to ${config.bindIp}:${config.bindPort}!`)
 })
