@@ -4,6 +4,7 @@ import URL from "url";
 import { UpgradeErrorCode } from "./enums.js";
 import { UpgradeFailure } from "./structs.js";
 import { Socket } from "net";
+import { WebSocket } from "ws";
 
 export namespace HTTPUtil {
     export async function route(req: http.IncomingMessage, res: http.ServerResponse) {
@@ -36,7 +37,10 @@ export namespace HTTPUtil {
                     socket.end()
                 } else {
                     if (WS.shouldHandle(req)) {
-                        WS.handleUpgrade(req, socket, head)
+                        const ws = await new Promise<WebSocket>(res => {
+                            WS.handleUpgrade(req, socket, head, ws => res(ws))
+                        })
+
                     } else {
                         socket.end()
                     }
@@ -45,7 +49,11 @@ export namespace HTTPUtil {
                 socket.end()
             }
         } else {
-
+            if (BACKEND) {
+                HTTPUtil.forwardWS(req, socket, head)
+            } else {
+                socket.end()
+            }
         }
     }
 
