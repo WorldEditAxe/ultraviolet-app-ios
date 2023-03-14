@@ -16,7 +16,7 @@ const logger = new Logger("ConnectionHandler")
 
 export namespace HTTPUtil {
     export async function route(req: http.IncomingMessage, res: http.ServerResponse) {
-        const url = URL.parse(req.url!)
+        const url = new URL.URL(req.url!, `http://${req.headers.host!}`)
         if (HTTPUtil.isGatewayConnectionAttempt(url.pathname!)) {
             res.writeHead(400)
                 .end(JSON.stringify({
@@ -81,11 +81,16 @@ export namespace HTTPUtil {
         }
     }
 
-    export function forwardHTTP(req: http.IncomingMessage, res: http.ServerResponse) {
+    /* NOTE: these are to be converted back into a TCP connection */
 
+    export function forwardHTTP(req: http.IncomingMessage, res: http.ServerResponse) {
+        const headers = req.headers,
+            route = new URL.URL(req.url!, `http://${req.headers.host!}`),
+            code = req.statusCode
     }
 
     export function forwardWS(req: http.IncomingMessage, socket: Socket, head: Buffer) {
-
+        const headers = req.headers,
+            route = new URL.URL(req.url!, `http://${req.headers.host!}`)
     }
 }
