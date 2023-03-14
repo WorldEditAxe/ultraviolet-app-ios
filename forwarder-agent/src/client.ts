@@ -7,7 +7,7 @@ import { Protocol } from "./protocol.js";
 
 export class UVClient extends EventEmitter {
     socket: WebSocket
-    connections: (Connection | WSConnection)[]
+    connections: Connection[]
     freedConnectionIds: number[] = []
     nextConnectionId: number = 0
 
@@ -34,6 +34,17 @@ export class UVClient extends EventEmitter {
     }
 }
 
+export declare interface UVClient {
+    on(event: 'ready', listener: Function): this
+    once(event: 'ready', listener: Function): this
+
+    on(event: 'connectionEnd', listener: (id: number) => void | Function): this
+    once(event: 'connectionEnd', listener: (id: number) => void | Function): this
+
+    on(event: 'connectionOpen', listener: (id: number) => void | Function): this
+
+}
+
 export class Connection extends Duplex {
     uvClient: UVClient
     connectionId: number
@@ -44,6 +55,7 @@ export class Connection extends Duplex {
         this.connectionId = connectionId
         this.uvClient = uvClient
         this._bindListeners()
+        this.uvClient.connections.push(this)
     }
 
     private _bindListeners() {
@@ -80,19 +92,9 @@ export class Connection extends Duplex {
         const destroyPacket = new SConnectionEndPacket()
         destroyPacket.channelId = this.connectionId
         Protocol.writePacket(this.uvClient.socket, this.connectionId, destroyPacket)
-    }
-}
-
-export class WSConnection {
-    ws: WebSocket
-    uvClient: UVClient
-    connectionId: number
-    readonly type = ConnectionType.HTTP
-    
-    constructor(ws: WebSocket, connectionId: number, uvClient: UVClient) {
-        this.ws = ws
-        this.connectionId = connectionId
-        this.uvClient = uvClient
+        this.uvClient.connections = this.uvClient.connections.splice(this.uvClient.connections.indexOf(this), 1)
+        this.uvClient.returnConnectionId(this.connectionId)
+        this.isClosed = true
     }
 }
 

@@ -143,23 +143,31 @@ export namespace HTTPUtil {
                     headers: headers
                 })
 
-                wsConnection.on('ping', (_ws: WebSocket, data: Buffer) => {
+                wsConnection.on('ping', data => {
                     ws.ping(data)
                 })
-                wsConnection.on('pong', (_ws: WebSocket, data: Buffer) => {
+                wsConnection.on('pong', data => {
                     ws.pong(data)
                 })
-                ws.on('ping', (_ws: WebSocket, data: Buffer) => {
+                ws.on('ping', data => {
                     wsConnection.ping(data)
                 })
-                ws.on('pong', (_ws: WebSocket, data: Buffer) => {
+                ws.on('pong', data => {
                     wsConnection.pong(data)
                 })
-
-                wsConnection.on('message', (_ws: WebSocket, data: any) => {
-
+                wsConnection.on('message', data => {
+                    ws.send(data)
                 })
-                
+                ws.on('message', data => {
+                    wsConnection.send(data)
+                })
+
+                wsConnection.once('close', (code) => {
+                    ws.close(code)
+                })
+                ws.once('close', code => {
+                    wsConnection.close(code)
+                })
                 wsConnection.once('error', () => {
                     ws.close()
                 })
