@@ -1,9 +1,9 @@
 import IPacket from "../../IPacket.js";
 import { Protocol } from "../../protocol.js";
 
-export class SConnectionEndPacket implements IPacket {
+export class CConnectionEndPacket implements IPacket {
     id: number = 0x00
-    boundTo: "CLIENT" | "SERVER" = "CLIENT"
+    boundTo: "CLIENT" | "SERVER" = "SERVER"
 
     channelId?: number
 
