@@ -7,7 +7,7 @@ import { Protocol } from "./protocol.js";
 
 export class UVClient extends EventEmitter {
     socket: WebSocket
-    connections: UpstreamConnection[]
+    connections: Connection[]
     freedConnectionIds: number[] = []
     nextConnectionId: number = 0
 
@@ -45,7 +45,7 @@ export declare interface UVClient {
 
 }
 
-export class UpstreamConnection extends Duplex {
+export class Connection extends Duplex {
     uvClient: UVClient
     connectionId: number
     isClosed: boolean = false
@@ -96,4 +96,14 @@ export class UpstreamConnection extends Duplex {
         this.uvClient.returnConnectionId(this.connectionId)
         this.isClosed = true
     }
+}
+
+export enum ConnectionState {
+    CONNECTED,
+    DISCONNECTED
+}
+
+export enum ConnectionType {
+    HTTP,
+    WEBSOCKET
 }

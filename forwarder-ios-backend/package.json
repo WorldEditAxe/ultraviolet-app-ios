@@ -1,0 +1,19 @@
+{
+  "name": "forwarder-ios-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^18.15.3",
+    "@types/varint": "^6.0.1",
+    "@types/ws": "^8.5.4",
+    "msgpackr": "^1.8.5",
+    "varint": "^6.0.0",
+    "ws": "^8.13.0"
+  }
+}
