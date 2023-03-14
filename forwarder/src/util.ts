@@ -10,7 +10,8 @@ import CIdentifyPacket from "./packets/identify/CIdentifyPacket.js";
 import { Protocol } from "./protocol.js";
 import { PROTO_VERSION } from "./meta.js";
 import SIdentifyFailurePacket, { IdentifyFailureReason } from "./packets/identify/SIdentifyFailurePacket.js";
-import { UVClient } from "./client.js";
+import { Connection, UVClient } from "./client.js";
+import SNewConnectionPacket from "./packets/ready/SNewConnectionPacket.js";
 
 const logger = new Logger("ConnectionHandler")
 
@@ -58,7 +59,8 @@ export namespace HTTPUtil {
                         const Cidentify = new CIdentifyPacket().from((await Protocol.readPacket(ws))[2])
                         if (Cidentify.protoVer! === PROTO_VERSION) {
                             const uvClient = new UVClient(ws)
-                            
+                            global.BACKEND = uvClient
+                            logger.info(`Login Success! Client [/${socket.remoteAddress}:${socket.remotePort}] has successfullly logged in as the upstream server.`)
                         } else {
                             const SError = new SIdentifyFailurePacket()
                             SError.reason = IdentifyFailureReason.BAD_VERSION
@@ -86,11 +88,74 @@ export namespace HTTPUtil {
     export function forwardHTTP(req: http.IncomingMessage, res: http.ServerResponse) {
         const headers = req.headers,
             route = new URL.URL(req.url!, `http://${req.headers.host!}`),
-            code = req.statusCode
+            cId = BACKEND!.getNextConnectionId(),
+            packet = new SNewConnectionPacket(),
+            virtualDuplex = new Connection(cId, BACKEND!)
+        packet.channelId = cId
+        packet.ip = req.socket.remoteAddress
+        packet.port = req.socket.remotePort
+        Protocol.writePacket(BACKEND!.socket, 0, packet)
+        const httpConnection = http.request(route, {
+            // any duplex is ok
+            createConnection: () => virtualDuplex as any,
+            host: 'localhost',
+            method: req.method,
+            headers: headers
+        }, httpRes => {
+            res.writeHead(httpRes.statusCode!, httpRes.statusMessage, httpRes.headers)
+            req.on('data', d => httpConnection.write(d))
+            httpRes.on('data', d => res.write(d))
+            req.once('close', () => {
+                virtualDuplex.destroy()
+                httpConnection.end()
+            })
+            httpRes.once('close', () => {
+                if (!virtualDuplex.destroyed)
+                    virtualDuplex.destroy()
+                res.end()
+            })
+        })
+        httpConnection.once('error', () => {
+            res.end()
+        })
+        req.once('error', () => {
+            httpConnection.end()
+        })
     }
 
     export function forwardWS(req: http.IncomingMessage, socket: Socket, head: Buffer) {
-        const headers = req.headers,
-            route = new URL.URL(req.url!, `http://${req.headers.host!}`)
+        if (WS.shouldHandle(req)) {
+            WS.handleUpgrade(req, socket, head, (ws, req) => {
+                const headers = req.headers,
+                    route = new URL.URL(req.url!, `http://${req.headers.host!}`),
+                    cId = BACKEND!.getNextConnectionId(),
+                    packet = new SNewConnectionPacket(),
+                    virtualDuplex = new Connection(cId, BACKEND!)
+                packet.channelId = cId
+                packet.ip = req.socket.remoteAddress
+                packet.port = req.socket.remotePort
+                Protocol.writePacket(BACKEND!.socket, 0, packet)
+                const wsConnection = new WebSocket(route, {
+                    // any duplex is ok
+                    createConnection: () => virtualDuplex as any,
+                    host: 'localhost',
+                    method: req.method,
+                    headers: headers
+                })
+
+                wsConnection.on('ping', (_this, d) => {
+                    ws.ping(d)
+                })
+                
+                wsConnection.once('error', () => {
+                    ws.close()
+                })
+                ws.once('error', () => {
+                    wsConnection.close()
+                })
+            })
+        } else {
+            socket.end()
+        }
     }
 }

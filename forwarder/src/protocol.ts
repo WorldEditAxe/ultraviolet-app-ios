@@ -351,45 +351,101 @@ export namespace Protocol {
         ]))
     }
 
-    export function readPacket(socket: WebSocket): Promise<[number, number, Buffer]> {
+    export function writeRaw(socket: WebSocket, connectionId: number, data: Buffer) {
+        const body = Buffer.concat([Protocol.writeVarInt(connectionId), data])
+        socket.send(Buffer.concat([Protocol.writeVarInt(body.length), data]))
+    }
+
+    export function readPacket(socket: WebSocket, connectionId?: number): Promise<[number, number, Buffer]> {
         return new Promise<[number, number, Buffer]>(async (res, rej) => {
-            const length = await new Promise<number | never>((res, rej) => {
-                const disconCb = () => {
-                    rej("Socket disconnected before data could be read.")
-                }
-                socket.once('data', d => {
-                    socket.removeListener('close', disconCb)
-                    res(Protocol.readVarInt(d).value)
-                })
-                socket.once('close', disconCb)
-            })
-            const data = await new Promise<Buffer>((res, rej) => {
-                let readBuffer = Buffer.alloc(length),
-                    i = 0
-                const disconCb = () => {
-                    rej("Socket disconnected before data could be read.")
-                }, dataCb = (d: Buffer) => {
-                    if (d.length > i + 1) {
-                        d = d.subarray(readBuffer.length - (i + 1))
-                        d.copy(readBuffer, i)
-                        socket.removeListener('data', dataCb)
-                        socket.removeListener('close', disconCb)
-                        res(readBuffer)
-                    } else {
-                        d.copy(readBuffer, i)
-                        i += d.length
+            while (true) {
+                const length = await new Promise<number | never>((res, rej) => {
+                    const disconCb = () => {
+                        rej("Socket disconnected before data could be read.")
                     }
+                    socket.once('data', d => {
+                        socket.removeListener('close', disconCb)
+                        res(Protocol.readVarInt(d).value)
+                    })
+                    socket.once('close', disconCb)
+                })
+                const data = await new Promise<Buffer>((res, rej) => {
+                    let readBuffer = Buffer.alloc(length),
+                        i = 0
+                    const disconCb = () => {
+                        rej("Socket disconnected before data could be read.")
+                    }, dataCb = (d: Buffer) => {
+                        if (d.length > i + 1) {
+                            d = d.subarray(readBuffer.length - (i + 1))
+                            d.copy(readBuffer, i)
+                            socket.removeListener('data', dataCb)
+                            socket.removeListener('close', disconCb)
+                            res(readBuffer)
+                        } else {
+                            d.copy(readBuffer, i)
+                            i += d.length
+                        }
+                    }
+                    socket.on('data', dataCb)
+                    socket.on('close', disconCb)
+                })
+                const channel = Protocol.readVarInt(data)
+                if (channel.value == connectionId) {
+                    const packetId = Protocol.readVarInt(channel.newBuffer)
+                    res([
+                        channel.value,
+                        packetId.value,
+                        packetId.newBuffer
+                    ])
+                    break
                 }
-                socket.on('data', dataCb)
-                socket.on('close', disconCb)
-            })
-            const channel = Protocol.readVarInt(data)
-            const packetId = Protocol.readVarInt(channel.newBuffer)
-            res([
-                channel.value,
-                packetId.value,
-                packetId.newBuffer
-            ])
+            }
+        })
+    }
+
+
+    export function readChannelRaw(socket: WebSocket, connectionId: number): Promise<[number, Buffer]> {
+        return new Promise<[number, Buffer]>(async (res, rej) => {
+            while (true) {
+                const length = await new Promise<number | never>((res, rej) => {
+                    const disconCb = () => {
+                        rej("Socket disconnected before data could be read.")
+                    }
+                    socket.once('data', d => {
+                        socket.removeListener('close', disconCb)
+                        res(Protocol.readVarInt(d).value)
+                    })
+                    socket.once('close', disconCb)
+                })
+                const data = await new Promise<Buffer>((res, rej) => {
+                    let readBuffer = Buffer.alloc(length),
+                        i = 0
+                    const disconCb = () => {
+                        rej("Socket disconnected before data could be read.")
+                    }, dataCb = (d: Buffer) => {
+                        if (d.length > i + 1) {
+                            d = d.subarray(readBuffer.length - (i + 1))
+                            d.copy(readBuffer, i)
+                            socket.removeListener('data', dataCb)
+                            socket.removeListener('close', disconCb)
+                            res(readBuffer)
+                        } else {
+                            d.copy(readBuffer, i)
+                            i += d.length
+                        }
+                    }
+                    socket.on('data', dataCb)
+                    socket.on('close', disconCb)
+                })
+                const channel = Protocol.readVarInt(data)
+                if (channel.value == connectionId) {
+                    res([
+                        channel.value,
+                        channel.newBuffer
+                    ])
+                    break
+                }
+            }
         })
     }
 }
