@@ -143,8 +143,21 @@ export namespace HTTPUtil {
                     headers: headers
                 })
 
-                wsConnection.on('ping', (_this, d) => {
-                    ws.ping(d)
+                wsConnection.on('ping', (_ws: WebSocket, data: Buffer) => {
+                    ws.ping(data)
+                })
+                wsConnection.on('pong', (_ws: WebSocket, data: Buffer) => {
+                    ws.pong(data)
+                })
+                ws.on('ping', (_ws: WebSocket, data: Buffer) => {
+                    wsConnection.ping(data)
+                })
+                ws.on('pong', (_ws: WebSocket, data: Buffer) => {
+                    wsConnection.pong(data)
+                })
+
+                wsConnection.on('message', (_ws: WebSocket, data: any) => {
+
                 })
                 
                 wsConnection.once('error', () => {
