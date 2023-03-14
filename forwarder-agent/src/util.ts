@@ -10,7 +10,7 @@ import CIdentifyPacket from "./packets/identify/CIdentifyPacket.js";
 import { Protocol } from "./protocol.js";
 import { PROTO_VERSION } from "./meta.js";
 import SIdentifyFailurePacket, { IdentifyFailureReason } from "./packets/identify/SIdentifyFailurePacket.js";
-import { UpstreamConnection, UVClient } from "./client.js";
+import { DownstreamConnection, SelfBackend } from "./client.js";
 import SNewConnectionPacket from "./packets/ready/SNewConnectionPacket.js";
 
 const logger = new Logger("ConnectionHandler")
@@ -58,7 +58,7 @@ export namespace HTTPUtil {
                         })
                         const Cidentify = new CIdentifyPacket().from((await Protocol.readPacket(ws))[2])
                         if (Cidentify.protoVer! === PROTO_VERSION) {
-                            const uvClient = new UVClient(ws)
+                            const uvClient = new SelfBackend(ws)
                             global.BACKEND = uvClient
                             logger.info(`Login Success! Client [/${socket.remoteAddress}:${socket.remotePort}] has successfullly logged in as the upstream server.`)
                         } else {
@@ -90,7 +90,7 @@ export namespace HTTPUtil {
             route = new URL.URL(req.url!, `http://${req.headers.host!}`),
             cId = BACKEND!.getNextConnectionId(),
             packet = new SNewConnectionPacket(),
-            virtualDuplex = new UpstreamConnection(cId, BACKEND!)
+            virtualDuplex = new DownstreamConnection(cId, BACKEND!)
         packet.channelId = cId
         packet.ip = req.socket.remoteAddress
         packet.port = req.socket.remotePort
@@ -130,7 +130,7 @@ export namespace HTTPUtil {
                     route = new URL.URL(req.url!, `http://${req.headers.host!}`),
                     cId = BACKEND!.getNextConnectionId(),
                     packet = new SNewConnectionPacket(),
-                    virtualDuplex = new UpstreamConnection(cId, BACKEND!)
+                    virtualDuplex = new DownstreamConnection(cId, BACKEND!)
                 packet.channelId = cId
                 packet.ip = req.socket.remoteAddress
                 packet.port = req.socket.remotePort
