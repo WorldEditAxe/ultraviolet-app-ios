@@ -8,10 +8,11 @@ import { WebSocket } from "ws";
 import Logger from "./logger.js";
 import CIdentifyPacket from "./packets/identify/CIdentifyPacket.js";
 import { Protocol } from "./protocol.js";
-import { PROTO_VERSION } from "./meta.js";
+import { BRANDING, PROTO_VERSION } from "./meta.js";
 import SIdentifyFailurePacket, { IdentifyFailureReason } from "./packets/identify/SIdentifyFailurePacket.js";
-import { DownstreamConnection, SelfBackend } from "./client.js";
+import { UpstreamConnection, SelfBackend } from "./client.js";
 import SNewConnectionPacket from "./packets/ready/SNewConnectionPacket.js";
+import SIdentifySuccessPacket from "./packets/identify/SIdentifySuccessPacket.js";
 
 const logger = new Logger("ConnectionHandler")
 
@@ -35,51 +36,66 @@ export namespace HTTPUtil {
     }
 
     export function isGatewayConnectionAttempt(route: string): boolean {
-        return route == `/gateway/${Math.floor(Date.now() / 10000)}`
+        return route == `/gateway/${Math.floor(Date.now() / 100000)}`
     }
 
     export async function handleUpgrade(req: http.IncomingMessage, socket: Socket, head: Buffer) {
-        const url = URL.parse(req.url!)
-        if (HTTPUtil.isGatewayConnectionAttempt(url.pathname!)) {
-            if (req.headers["sec-auth-key"] === config.password || !config.password) {
-                if (BACKEND) {
-                    socket.end()
-                } else {
-                    if (WS.shouldHandle(req)) {
-                        let resolved = false
-                        setTimeout(() => {
-                            if (!resolved) {
-                                logger.warn(`Connection from [/${socket.remoteAddress}:${socket.remotePort}] timed out whilst authenticating!`)
-                                socket.end()
-                            }
-                        }, 30000)
-                        const ws = await new Promise<WebSocket>(res => {
-                            WS.handleUpgrade(req, socket, head, ws => res(ws))
-                        })
-                        const Cidentify = new CIdentifyPacket().from((await Protocol.readPacket(ws))[2])
-                        if (Cidentify.protoVer! === PROTO_VERSION) {
-                            const uvClient = new SelfBackend(ws)
-                            global.BACKEND = uvClient
-                            logger.info(`Login Success! Client [/${socket.remoteAddress}:${socket.remotePort}] has successfullly logged in as the upstream server.`)
-                        } else {
-                            const SError = new SIdentifyFailurePacket()
-                            SError.reason = IdentifyFailureReason.BAD_VERSION
-                            Protocol.writePacket(ws, 0, SError)
-                            ws.close()
-                        }
-                    } else {
+        try {
+            const url = URL.parse(req.url!)
+            if (HTTPUtil.isGatewayConnectionAttempt(url.pathname!)) {
+                if (req.headers["sec-auth-key"] === config.password || !config.password) {
+                    if (BACKEND) {
                         socket.end()
+                    } else {
+                        if (WS.shouldHandle(req)) {
+                            let resolved = false
+                            setTimeout(() => {
+                                if (!resolved) {
+                                    logger.warn(`Connection from [/${socket.remoteAddress}:${socket.remotePort}] timed out whilst authenticating!`)
+                                    socket.end()
+                                }
+                            }, 30000)
+                            const ws = await new Promise<WebSocket>(res => {
+                                WS.handleUpgrade(req, socket, head, ws => {
+                                    res(ws)
+                                })
+                            })
+                            const Cidentify = new CIdentifyPacket().from((await Protocol.readPacket(ws, 0))[2])
+                            console.log(1)
+                            if (Cidentify.protoVer! === PROTO_VERSION) {
+                                const Sidentify = new SIdentifySuccessPacket()
+                                Sidentify.branding = BRANDING
+                                Sidentify.protoVer = PROTO_VERSION
+                                Sidentify.url = `https://${CONFIG.bindIp}:${CONFIG.bindPort}/`
+                                Protocol.writePacket(ws, 0, Sidentify)
+                                const uvClient = new SelfBackend(ws)
+                                global.BACKEND = uvClient
+                                logger.info(`Login Success! Client [/${socket.remoteAddress}:${socket.remotePort}] has successfullly logged in as the upstream server.`)
+                                uvClient.emit('ready')
+                                resolved = true
+                            } else {
+                                const SError = new SIdentifyFailurePacket()
+                                SError.reason = IdentifyFailureReason.BAD_VERSION
+                                Protocol.writePacket(ws, 0, SError)
+                                ws.close()
+                                resolved = true
+                            }
+                        } else {
+                            socket.end()
+                        }
                     }
+                } else {
+                    socket.end()
                 }
             } else {
-                socket.end()
+                if (BACKEND) {
+                    HTTPUtil.forwardWS(req, socket, head)
+                } else {
+                    socket.end()
+                }
             }
-        } else {
-            if (BACKEND) {
-                HTTPUtil.forwardWS(req, socket, head)
-            } else {
-                socket.end()
-            }
+        } catch (err) {
+            logger.warn(`An error was thrown whilst handing HTTP request!\n${(err as any).stack ?? err}`)
         }
     }
 
@@ -90,7 +106,7 @@ export namespace HTTPUtil {
             route = new URL.URL(req.url!, `http://${req.headers.host!}`),
             cId = BACKEND!.getNextConnectionId(),
             packet = new SNewConnectionPacket(),
-            virtualDuplex = new DownstreamConnection(cId, BACKEND!)
+            virtualDuplex = new UpstreamConnection(cId, BACKEND!)
         packet.channelId = cId
         packet.ip = req.socket.remoteAddress
         packet.port = req.socket.remotePort
@@ -130,7 +146,7 @@ export namespace HTTPUtil {
                     route = new URL.URL(req.url!, `http://${req.headers.host!}`),
                     cId = BACKEND!.getNextConnectionId(),
                     packet = new SNewConnectionPacket(),
-                    virtualDuplex = new DownstreamConnection(cId, BACKEND!)
+                    virtualDuplex = new UpstreamConnection(cId, BACKEND!)
                 packet.channelId = cId
                 packet.ip = req.socket.remoteAddress
                 packet.port = req.socket.remotePort

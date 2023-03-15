@@ -369,6 +369,7 @@ export namespace Protocol {
                     })
                     socket.once('close', disconCb)
                 })
+                console.log("got len")
                 const data = await new Promise<Buffer>((res, rej) => {
                     let readBuffer = Buffer.alloc(length),
                         i = 0

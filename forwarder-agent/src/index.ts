@@ -20,7 +20,7 @@ if (!config.password) {
     logger.warn("You don't have a password set! This is a security risk, change this immediately.")
 }
 if (!config.tls.key || !config.tls.cert) {
-    logger.warn("HTTPS/TLS is not enabled! You will not be able to use Ultraviolet, as it requires the use of web workers that are unavailable under HTTP!")
+    logger.warn("HTTPS/TLS is not enabled! You will not be able to use Ultraviolet, as it requires the use of web workers that are unavailable under HTTP! Ignore this message if your server is ran behind a reverse proxy with SSL enabled (i.e. Nginx).")
     server = http.createServer(async (req, res) => {
         try { await HTTPUtil.route(req, res) }
         catch (err) {

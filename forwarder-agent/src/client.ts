@@ -11,7 +11,7 @@ const endPacketId = (new SConnectionEndPacket()).id
 
 export class SelfBackend extends EventEmitter {
     socket: WebSocket
-    connections: DownstreamConnection[]
+    connections: UpstreamConnection[]
     state: ConnectionState = ConnectionState.CONNECTED
     freedConnectionIds: number[] = []
     nextConnectionId: number = 1
@@ -80,22 +80,20 @@ export declare interface SelfBackend {
     on(event: 'end', listener: Function): this
     once(event: 'end', listener: Function): this
 
-    on(event: 'connectionEnd', listener: (connection: DownstreamConnection) => void | Function): this
-    once(event: 'connectionEnd', listener: (connection: DownstreamConnection) => void | Function): this
+    on(event: 'connectionEnd', listener: (connection: UpstreamConnection) => void | Function): this
+    once(event: 'connectionEnd', listener: (connection: UpstreamConnection) => void | Function): this
 
-    on(event: 'connectionOpen', listener: (connection: DownstreamConnection) => void | Function): this
-    once(event: 'connectionOpen', listener: (connection: DownstreamConnection) => void | Function): this
+    on(event: 'connectionOpen', listener: (connection: UpstreamConnection) => void | Function): this
+    once(event: 'connectionOpen', listener: (connection: UpstreamConnection) => void | Function): this
 }
 
-export class DownstreamConnection extends Duplex {
+export class UpstreamConnection extends Duplex {
     backend: SelfBackend
-    socket: Socket
     connectionId: number
     isClosed: boolean = false
     
-    constructor(connection: Socket, connectionId: number, uvClient: SelfBackend) {
+    constructor(connectionId: number, uvClient: SelfBackend) {
         super()
-        this.socket = connection
         this.connectionId = connectionId
         this.backend = uvClient
         this._bindListeners()
