@@ -235,10 +235,11 @@ export namespace Protocol {
         return Buffer.from(varint.encode(num))
     }
 
-    export function readVarInt(buff: Buffer): ReadResult<number> {
+    export function readVarInt(buff: Buffer): ReadResult<number> & { readBytes: number } {
         const rr = varint.decode(buff)
         return {
             newBuffer: buff.subarray(varint.decode.bytes),
+            readBytes: varint.decode.bytes!, 
             value: rr
         }
     }
@@ -247,7 +248,7 @@ export namespace Protocol {
         return Protocol.writeVarInt(num)
     }
 
-    export function readVarLong(buff: Buffer): ReadResult<number> {
+    export function readVarLong(buff: Buffer): ReadResult<number> & { readBytes: number } {
         return Protocol.readVarInt(buff)
     }
 
@@ -354,113 +355,5 @@ export namespace Protocol {
     export function writeRaw(socket: WebSocket, connectionId: number, data: Buffer) {
         const body = Buffer.concat([Protocol.writeVarInt(connectionId), data])
         socket.send(Buffer.concat([Protocol.writeVarInt(body.length), data]))
-    }
-
-    export function readPacket(socket: WebSocket, channelId?: number): Promise<[number, number, Buffer]> {
-        return new Promise<[number, number, Buffer]>(async (res, rej) => {
-            while (true) {
-                try {
-                    let data: Buffer = Buffer.alloc(0)
-                    const length = await new Promise<number | never>((res, rej) => {
-                        const disconCb = () => {
-                            rej("Socket disconnected before data could be read.")
-                        }, readCb = (d: Buffer) => {
-                            socket.removeListener('close', disconCb)
-                            socket.removeListener('message', readCb)
-                            const len = Protocol.readVarInt(d as Buffer)
-                            res(len.value)
-                            data = len.newBuffer
-                        }
-                        socket.once('message', readCb)
-                        socket.once('close', disconCb)
-                    })
-                    if (data.length < length) {
-                        await new Promise<Buffer>((res, rej) => {
-                            let i = 0
-                            const disconCb = () => {
-                                rej("Socket disconnected before data could be read.")
-                            }, dataCb = (d: Buffer) => {
-                                if (d.length > i + 1) {
-                                    d = d.subarray(data.length - (i + 1))
-                                    d.copy(data, i)
-                                    socket.removeListener('message', dataCb)
-                                    socket.removeListener('close', disconCb)
-                                    res(data)
-                                } else {
-                                    d.copy(data, i)
-                                    i += d.length
-                                }
-                            }
-                            socket.on('message', dataCb)
-                            socket.on('close', disconCb)
-                        })
-                    }
-                    const channel = Protocol.readVarInt(data)
-                    if (channel.value == channelId || channelId == null) {
-                        const packetId = Protocol.readVarInt(channel.newBuffer)
-                        res([
-                            channel.value,
-                            packetId.value,
-                            packetId.newBuffer
-                        ])
-                        break
-                    }
-                } catch (err) { rej(err) }
-            }
-        })
-    }
-
-
-    export function readChannelRaw(socket: WebSocket, connectionId: number): Promise<[number, Buffer]> {
-        return new Promise<[number, Buffer]>(async (res, rej) => {
-            while (true) {
-                try {
-                    let data: Buffer = Buffer.alloc(0)
-                    const length = await new Promise<number | never>((res, rej) => {
-                        const disconCb = () => {
-                            rej("Socket disconnected before data could be read.")
-                        }, readCb = (d: Buffer) => {
-                            socket.removeListener('close', disconCb)
-                            socket.removeListener('message', readCb)
-                            const len = Protocol.readVarInt(d as Buffer)
-                            res(len.value)
-                            data = len.newBuffer
-                        }
-                        socket.once('message', readCb)
-                        socket.once('close', disconCb)
-                    })
-                    if (data.length < length) {
-                        await new Promise<Buffer>((res, rej) => {
-                            let i = 0
-                            const disconCb = () => {
-                                rej("Socket disconnected before data could be read.")
-                            }, dataCb = (d: Buffer) => {
-                                if (d.length > i + 1) {
-                                    d = d.subarray(data.length - i + 1)
-                                    d.copy(data, i)
-                                    i += d.length
-                                    socket.removeListener('message', dataCb)
-                                    socket.removeListener('close', disconCb)
-                                    res(data)
-                                } else {
-                                    d.copy(data, i)
-                                    i += d.length
-                                }
-                            }
-                            socket.on('message', dataCb)
-                            socket.on('close', disconCb)
-                        })
-                    }
-                    const channel = Protocol.readVarInt(data)
-                    if (channel.value == connectionId) {
-                        res([
-                            channel.value,
-                            channel.newBuffer
-                        ])
-                        break
-                    }
-                } catch (err) { rej(err) }
-            }
-        })
     }
 }
