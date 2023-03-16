@@ -61,19 +61,23 @@ export class SelfBackend extends EventEmitter {
                         const newConP = new SNewConnectionPacket().from(packet[2]),
                             socket = new Socket(),
                             downstreamCon = new DownstreamConnection(socket, newConP.channelId!, this)
+                        console.log(newConP.channelId)
                         socket.connect({
                             host: config.serverIp,
                             port: config.serverPort
                         }, () => {
                             logger.info(`[CONNECTION] New downstream connection from [/${newConP.ip}:${newConP.port}].`)
-                            socket.on('data', d => downstreamCon.write(d))
-                            downstreamCon.on('data', d => socket.write(d))
-
-                            socket.once('close', () => downstreamCon.destroy())
-                            downstreamCon.once('close', () => downstreamCon.destroy())
                         }).once('error', () => {
                             downstreamCon.destroy()
                         })
+                        socket.on('data', d => downstreamCon.write(d))
+                        downstreamCon.on('data', d => {
+                            console.log(d.toString())
+                            socket.write(d)
+                        })
+
+                        socket.once('close', () => downstreamCon.destroy())
+                        downstreamCon.once('close', () => downstreamCon.destroy())
                     }
                 }
             }

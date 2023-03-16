@@ -22,6 +22,15 @@ export default class SNewConnectionPacket implements IPacket {
     }
 
     to(): Buffer {
+        console.log(Protocol.bulkRead(Protocol.bulkWrite([
+            this.ip!,
+            this.port!,
+            this.channelId!
+        ], [
+            Protocol.ProtocolDatatype.STRING,
+            Protocol.ProtocolDatatype.VARINT,
+            Protocol.ProtocolDatatype.VARINT
+        ]), [Protocol.ProtocolDatatype.STRING, Protocol.ProtocolDatatype.VARINT, Protocol.ProtocolDatatype.VARINT]))
         return Protocol.bulkWrite([
             this.ip!,
             this.port!,

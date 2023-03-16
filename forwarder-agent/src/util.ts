@@ -113,7 +113,6 @@ export namespace HTTPUtil {
         const httpConnection = http.request(route, {
             // any duplex is ok
             createConnection: () => virtualDuplex as any,
-            host: 'localhost',
             method: req.method,
             headers: headers
         }, httpRes => {
