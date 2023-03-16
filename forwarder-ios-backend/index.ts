@@ -30,6 +30,6 @@ ws.on('open', () => {
     logger.info(`Connected to WebSocket backend, attempting to complete handshake...`)
     forwarder = new SelfBackend(ws)
     forwarder.once('ready', () => {
-        logger.info(`Backend is ready!`)
+        logger.info(`Logged in! The backend forwarder is ready.`)
     })
 })

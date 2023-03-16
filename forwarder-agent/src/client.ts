@@ -3,11 +3,13 @@ import http from "http"
 import { Socket } from "net";
 import { Duplex } from "stream";
 import { WebSocket } from "ws";
+import Logger from "./logger.js";
 import { CConnectionEndPacket } from "./packets/ready/CConnectionEndPacket.js";
 import { SConnectionEndPacket } from "./packets/ready/SConnectionEndPacket.js";
 import { Protocol } from "./protocol.js";
 
 const endPacketId = (new SConnectionEndPacket()).id
+const logger = new Logger("ConnectionHandler")
 
 export class SelfBackend extends EventEmitter {
     socket: WebSocket
@@ -25,33 +27,39 @@ export class SelfBackend extends EventEmitter {
 
     private _bindListeners() {
         ;(async () => {
-            while (true) {
-                if (this.socket.readyState == this.socket.OPEN) {
-                    const packet = await Protocol.readPacket(this.socket, 0)
-                    if (packet[1] == endPacketId) {
-                        const cEndPacket = new SConnectionEndPacket().from(packet[2]),
-                            connection = this.connections.filter(c => c.connectionId == cEndPacket.channelId!)[0]
-                        if (connection) {
-                            connection.destroy()
-                            this.connections = this.connections.splice(this.connections.indexOf(connection), 1)
-                            this.returnConnectionId(connection.connectionId)
-                            this.emit('connectionEnd', connection)
-                        }
+            this.socket.once('close', () => {
+                logger.info("Upstream server disconnected from agent!")
+                this.state = ConnectionState.DISCONNECTED
+                this.connections.forEach(c => {
+                    if (!c.destroyed) {
+                        c.destroy()
+                        this.emit('connectionEnd', c)
                     }
-                } else {
-                    this.state = ConnectionState.DISCONNECTED
-                    this.connections.forEach(c => {
-                        if (!c.destroyed) {
-                            c.destroy()
-                            this.emit('connectionEnd', c)
+                })
+                this.connections = []
+                this.freedConnectionIds = []
+                this.nextConnectionId = 1
+                this.emit('end')
+                global.BACKEND = null
+            })
+            while (true) {
+                try {
+                    if (this.socket.readyState == this.socket.OPEN) {
+                        const packet = await Protocol.readPacket(this.socket, 0)
+                        if (packet[1] == endPacketId) {
+                            const cEndPacket = new SConnectionEndPacket().from(packet[2]),
+                                connection = this.connections.filter(c => c.connectionId == cEndPacket.channelId!)[0]
+                            if (connection) {
+                                connection.destroy()
+                                this.connections = this.connections.splice(this.connections.indexOf(connection), 1)
+                                this.returnConnectionId(connection.connectionId)
+                                this.emit('connectionEnd', connection)
+                            }
                         }
-                    })
-                    this.connections = []
-                    this.freedConnectionIds = []
-                    this.nextConnectionId = 1
-                    this.emit('end')
-                    break
-                }
+                    } else {
+                        break
+                    }
+                } catch { break }
             }
         })()
     }

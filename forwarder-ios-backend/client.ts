@@ -86,7 +86,7 @@ export class SelfBackend extends EventEmitter {
         Cidentify.branding = BRANDING
         Protocol.writePacket(this.socket, 0, Cidentify)
         
-        const readIdentify = await Protocol.readPacket(this.socket)
+        const readIdentify = await Protocol.readPacket(this.socket, 0)
         if (readIdentify[1] == 0x00) {
             const success = new SIdentifySuccessPacket().from(readIdentify[2])
             if (success.protoVer! == PROTO_VERSION) {

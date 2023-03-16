@@ -61,7 +61,6 @@ export namespace HTTPUtil {
                                 })
                             })
                             const Cidentify = new CIdentifyPacket().from((await Protocol.readPacket(ws, 0))[2])
-                            console.log(1)
                             if (Cidentify.protoVer! === PROTO_VERSION) {
                                 const Sidentify = new SIdentifySuccessPacket()
                                 Sidentify.branding = BRANDING
@@ -70,7 +69,7 @@ export namespace HTTPUtil {
                                 Protocol.writePacket(ws, 0, Sidentify)
                                 const uvClient = new SelfBackend(ws)
                                 global.BACKEND = uvClient
-                                logger.info(`Login Success! Client [/${socket.remoteAddress}:${socket.remotePort}] has successfullly logged in as the upstream server.`)
+                                logger.info(`Login Success! Client [/${socket.remoteAddress}:${socket.remotePort}] has successfully logged in as the upstream server.`)
                                 uvClient.emit('ready')
                                 resolved = true
                             } else {
@@ -120,7 +119,9 @@ export namespace HTTPUtil {
         }, httpRes => {
             res.writeHead(httpRes.statusCode!, httpRes.statusMessage, httpRes.headers)
             req.on('data', d => httpConnection.write(d))
-            httpRes.on('data', d => res.write(d))
+            httpRes.on('data', d => {
+                res.write(d)
+            })
             req.once('close', () => {
                 virtualDuplex.destroy()
                 httpConnection.end()
