@@ -12,6 +12,7 @@ import { CConnectionEndPacket } from "./packets/ready/CConnectionEndPacket.js";
 import { SConnectionEndPacket } from "./packets/ready/SConnectionEndPacket.js";
 import SNewConnectionPacket from "./packets/ready/SNewConnectionPacket.js";
 import { Protocol } from "./protocol.js";
+import IPacket from "./IPacket.js";
 
 const endPacketId = (new SConnectionEndPacket()).id
 const newConnectionPacketId = (new SNewConnectionPacket()).id
@@ -25,6 +26,7 @@ export class SelfBackend extends EventEmitter {
     constructor(socket: WebSocket) {
         super()
         this.socket = socket
+        this.socket.pause()
         this.connections = []
         ;(async () => {
             await this._performHandshake()
@@ -49,6 +51,7 @@ export class SelfBackend extends EventEmitter {
             while (true) {
                 if (this.socket.readyState == this.socket.OPEN) {
                     const packet = await Protocol.readPacket(this.socket, 0)
+                    this.emit('packet', packet)
                     if (packet[1] == endPacketId) {
                         const cEndPacket = new SConnectionEndPacket().from(packet[2]),
                             connection = this.connections.filter(c => c.connectionId == cEndPacket.channelId!)[0]
@@ -61,7 +64,6 @@ export class SelfBackend extends EventEmitter {
                         const newConP = new SNewConnectionPacket().from(packet[2]),
                             socket = new Socket(),
                             downstreamCon = new DownstreamConnection(socket, newConP.channelId!, this)
-                        console.log(newConP.channelId)
                         socket.connect({
                             host: config.serverIp,
                             port: config.serverPort
@@ -112,6 +114,9 @@ export class SelfBackend extends EventEmitter {
 export declare interface SelfBackend {
     on(event: 'ready', listener: Function): this
     once(event: 'ready', listener: Function): this
+
+    on(event: 'packet', listener: (packet: IPacket) => void | Function): this
+    once(event: 'packet', listener: (packet: IPacket) => void | Function): this
 
     on(event: 'end', listener: Function): this
     once(event: 'end', listener: Function): this
@@ -165,7 +170,7 @@ export class DownstreamConnection extends Duplex {
     public _destroy(error: Error | null, callback: (error: Error | null) => void): void {
         const destroyPacket = new CConnectionEndPacket()
         destroyPacket.channelId = this.connectionId
-        Protocol.writePacket(this.backend.socket, this.connectionId, destroyPacket)
+        Protocol.writePacket(this.backend.socket, 0, destroyPacket)
         this.backend.connections = this.backend.connections.splice(this.backend.connections.indexOf(this), 1)
         this.isClosed = true
     }

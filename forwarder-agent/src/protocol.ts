@@ -238,7 +238,7 @@ export namespace Protocol {
     export function readVarInt(buff: Buffer): ReadResult<number> {
         const rr = varint.decode(buff)
         return {
-            newBuffer: buff.subarray(varint.decode.length - 1),
+            newBuffer: buff.subarray(varint.decode.bytes),
             value: rr
         }
     }
@@ -364,30 +364,30 @@ export namespace Protocol {
                     const length = await new Promise<number | never>((res, rej) => {
                         const disconCb = () => {
                             rej("Socket disconnected before data could be read.")
-                        }
-                        socket.once('message', d => {
+                        }, readCb = (d: Buffer) => {
                             socket.removeListener('close', disconCb)
+                            socket.removeListener('message', readCb)
                             const len = Protocol.readVarInt(d as Buffer)
                             res(len.value)
                             data = len.newBuffer
-                        })
+                        }
+                        socket.once('message', readCb)
                         socket.once('close', disconCb)
                     })
                     if (data.length < length) {
                         await new Promise<Buffer>((res, rej) => {
-                            let readBuffer = Buffer.alloc(length),
-                                i = 0
+                            let i = 0
                             const disconCb = () => {
                                 rej("Socket disconnected before data could be read.")
                             }, dataCb = (d: Buffer) => {
                                 if (d.length > i + 1) {
-                                    d = d.subarray(readBuffer.length - (i + 1))
-                                    d.copy(readBuffer, i)
+                                    d = d.subarray(data.length - (i + 1))
+                                    d.copy(data, i)
                                     socket.removeListener('message', dataCb)
                                     socket.removeListener('close', disconCb)
-                                    res(readBuffer)
+                                    res(data)
                                 } else {
-                                    d.copy(readBuffer, i)
+                                    d.copy(data, i)
                                     i += d.length
                                 }
                             }
@@ -419,30 +419,31 @@ export namespace Protocol {
                     const length = await new Promise<number | never>((res, rej) => {
                         const disconCb = () => {
                             rej("Socket disconnected before data could be read.")
-                        }
-                        socket.once('message', d => {
+                        }, readCb = (d: Buffer) => {
                             socket.removeListener('close', disconCb)
+                            socket.removeListener('message', readCb)
                             const len = Protocol.readVarInt(d as Buffer)
-                            data = len.newBuffer
                             res(len.value)
-                        })
+                            data = len.newBuffer
+                        }
+                        socket.once('message', readCb)
                         socket.once('close', disconCb)
                     })
                     if (data.length < length) {
                         await new Promise<Buffer>((res, rej) => {
-                            let readBuffer = Buffer.alloc(length),
-                                i = 0
+                            let i = 0
                             const disconCb = () => {
                                 rej("Socket disconnected before data could be read.")
                             }, dataCb = (d: Buffer) => {
                                 if (d.length > i + 1) {
-                                    d = d.subarray(readBuffer.length - (i + 1))
-                                    d.copy(readBuffer, i)
+                                    d = d.subarray(data.length - i + 1)
+                                    d.copy(data, i)
+                                    i += d.length
                                     socket.removeListener('message', dataCb)
                                     socket.removeListener('close', disconCb)
-                                    res(readBuffer)
+                                    res(data)
                                 } else {
-                                    d.copy(readBuffer, i)
+                                    d.copy(data, i)
                                     i += d.length
                                 }
                             }

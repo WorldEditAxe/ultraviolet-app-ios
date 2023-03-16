@@ -121,21 +121,21 @@ export namespace HTTPUtil {
             httpRes.on('data', d => {
                 res.write(d)
             })
-            req.once('close', () => {
-                virtualDuplex.destroy()
-                httpConnection.end()
-            })
-            httpRes.once('close', () => {
-                if (!virtualDuplex.destroyed)
-                    virtualDuplex.destroy()
-                res.end()
-            })
         })
         httpConnection.once('error', () => {
             res.end()
         })
         req.once('error', () => {
             httpConnection.end()
+        })
+        req.once('close', () => {
+            virtualDuplex.destroy()
+            httpConnection.end()
+        })
+        httpConnection.once('close', () => {
+            if (!virtualDuplex.destroyed)
+                virtualDuplex.destroy()
+            res.end()
         })
     }
 
@@ -147,6 +147,7 @@ export namespace HTTPUtil {
                     cId = BACKEND!.getNextConnectionId(),
                     packet = new SNewConnectionPacket(),
                     virtualDuplex = new UpstreamConnection(cId, BACKEND!)
+                route.protocol = 'ws'
                 packet.channelId = cId
                 packet.ip = req.socket.remoteAddress
                 packet.port = req.socket.remotePort

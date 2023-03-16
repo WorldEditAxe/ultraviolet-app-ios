@@ -135,7 +135,7 @@ export class UpstreamConnection extends Duplex {
     public _destroy(error: Error | null, callback: (error: Error | null) => void, ): void {
         const destroyPacket = new SConnectionEndPacket()
         destroyPacket.channelId = this.connectionId
-        Protocol.writePacket(this.backend.socket, this.connectionId, destroyPacket)
+        Protocol.writePacket(this.backend.socket, 0, destroyPacket)
         this.backend.connections = this.backend.connections.splice(this.backend.connections.indexOf(this), 1)
         this.backend.returnConnectionId(this.connectionId)
         this.isClosed = true
