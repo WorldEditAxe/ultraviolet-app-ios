@@ -168,13 +168,26 @@ export class DownstreamConnection extends Duplex {
         // handled by this._readCb
     }
 
-    public _destroy(error: Error | null, callback: (error: Error | null) => void): void {
+    public _destroy(error?: Error | null, callback?: (error: Error | null) => void): void {
         const destroyPacket = new CConnectionEndPacket()
         destroyPacket.channelId = this.channelId
         this.backend.handler.writePacket(destroyPacket, 0)
         this.backend.handler.removeListener("packet", this._dataCb! as any)
         this.backend.connections = this.backend.connections.splice(this.backend.connections.indexOf(this), 1)
         this.isClosed = true
+        if (callback) callback(error ?? null)
+    }
+
+    public end(cb?: (() => void) | undefined): this;
+    public end(chunk: any, cb?: (() => void) | undefined): this;
+    public end(chunk: any, encoding?: BufferEncoding | undefined, cb?: (() => void) | undefined): this;
+    public end(chunk?: unknown, encoding?: unknown, cb?: unknown): this {
+        if (chunk != null) {
+            this.write(chunk, encoding as any)
+        }
+        // this._destroy(null)
+        if (cb != null) (cb as Function)()
+        return this
     }
 }
 

@@ -98,7 +98,6 @@ export class StreamWrapper extends EventEmitter {
                     this._readLen = null
                 } else {
                     while (true) {
-                        // https://github.com/pollge-trolling/framework/blob/main/src/commons/encrypted_sockets.ts
                         const len = Protocol.readVarInt(this._readBuffer)
                         this._readLen = len.value
                         this._readBuffer = this._readBuffer!.subarray(len.readBytes)

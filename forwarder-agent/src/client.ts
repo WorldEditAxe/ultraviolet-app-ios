@@ -4,10 +4,12 @@ import { Socket } from "net";
 import { Duplex } from "stream";
 import { WebSocket } from "ws";
 import Logger from "./logger.js";
+import { CConnectionEndPacket } from "./packets/ready/CConnectionEndPacket.js";
 import { SConnectionEndPacket } from "./packets/ready/SConnectionEndPacket.js";
+import { Protocol } from "./protocol.js";
 import { StreamWrapper } from "./stream_wrapper.js";
 
-const endPacketId = (new SConnectionEndPacket()).id
+const endPacketId = (new CConnectionEndPacket()).id
 const logger = new Logger("ConnectionHandler")
 
 export class RemoteBackend extends EventEmitter {
@@ -44,8 +46,9 @@ export class RemoteBackend extends EventEmitter {
         })
         this.handler.on('packet', (id, data) => {
             if (id == 0) {
-                if (data[0] == endPacketId) {
-                    const cEndPacket = new SConnectionEndPacket().from(data),
+                const pId = Protocol.readVarInt(data)
+                if (pId.value == endPacketId) {
+                    const cEndPacket = new SConnectionEndPacket().from(pId.newBuffer),
                         connection = this.connections.filter(c => c.channelId == cEndPacket.channelId!)[0]
                     if (connection) {
                         connection.destroy()
@@ -71,7 +74,11 @@ export class RemoteBackend extends EventEmitter {
     }
 
     returnConnectionId(cId: number) {
-        this.freedConnectionIds.push(cId)
+        if (this.freedConnectionIds.filter(i => i == cId).length == 0) {
+            this.freedConnectionIds.push(cId)
+        } else {
+            logger.warn("returnConnectionId is attempting to return a channel ID already in array!?")
+        }
     }
 }
 
@@ -123,13 +130,26 @@ export class UpstreamConnection extends Duplex {
         // handled by this._readCb
     }
 
-    public _destroy(error: Error | null, callback: (error: Error | null) => void): void {
+    public _destroy(error?: Error | null, callback?: (error: Error | null) => void): void {
         const destroyPacket = new SConnectionEndPacket()
         destroyPacket.channelId = this.channelId
         this.backend.handler.writePacket(destroyPacket, 0)
         this.backend.handler.removeListener("packet", this._dataCb! as any)
         this.backend.connections = this.backend.connections.splice(this.backend.connections.indexOf(this), 1)
         this.isClosed = true
+        if (callback) callback(error ?? null)
+    }
+
+    public end(cb?: (() => void) | undefined): this;
+    public end(chunk: any, cb?: (() => void) | undefined): this;
+    public end(chunk: any, encoding?: BufferEncoding | undefined, cb?: (() => void) | undefined): this;
+    public end(chunk?: unknown, encoding?: unknown, cb?: unknown): this {
+        if (chunk != null) {
+            this.write(chunk, encoding as any)
+        }
+        this._destroy(null)
+        if (cb != null) (cb as Function)()
+        return this
     }
 }
 

@@ -133,18 +133,20 @@ export namespace HTTPUtil {
         if (WS.shouldHandle(req)) {
             WS.handleUpgrade(req, socket, head, async (ws, req) => {
                 const headers = req.headers,
-                    route = new URL.URL(req.url!, `http://${req.headers.host!}`),
-                    cId = BACKEND!.getNextConnectionId(),
-                    packet = new SNewConnectionPacket(),
-                    virtualDuplex = new UpstreamConnection(cId, BACKEND!)
-                route.protocol = 'ws'
-                packet.channelId = cId
-                packet.ip = req.socket.remoteAddress
-                packet.port = req.socket.remotePort
-                BACKEND!.handler.writePacket(packet, 0)
+                    route = new URL.URL(req.url!, `http://${req.headers.host!}`)
                 const wsConnection = new WebSocket(route, {
                     // any duplex is ok
-                    createConnection: () => virtualDuplex as any,
+                    createConnection: (options, callback) => {
+                        const cId = BACKEND!.getNextConnectionId(),
+                            packet = new SNewConnectionPacket(),
+                            tunnel = new UpstreamConnection(cId, BACKEND!)
+                        packet.channelId = cId
+                        packet.ip = req.socket.remoteAddress
+                        packet.port = req.socket.remotePort
+                        BACKEND!.handler.writePacket(packet, 0)
+                        callback(null as any, tunnel as any)
+                        return tunnel as any
+                    },
                     host: 'localhost',
                     method: req.method,
                     headers: headers
@@ -174,12 +176,6 @@ export namespace HTTPUtil {
                 })
                 ws.once('close', code => {
                     wsConnection.close(code)
-                })
-                wsConnection.once('error', () => {
-                    ws.close()
-                })
-                ws.once('error', () => {
-                    wsConnection.close()
                 })
             })
         } else {
