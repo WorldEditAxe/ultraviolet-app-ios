@@ -120,7 +120,6 @@ export namespace HTTPUtil {
             return false
         })
         const httpConnection = http.request(route, {
-            createConnection: () => tunnel as any,
             method: req.method,
             headers: headers
         })
@@ -129,8 +128,8 @@ export namespace HTTPUtil {
             req.pipe(tunnel)
             tunnel.pipe(res)
         })
-        httpConnection.once('error', res.end)
-        req.once('error', httpConnection.end)
+        httpConnection.once('error', res.destroy)
+        req.once('error', httpConnection.destroy)
         req.once('close', () => {
             tunnel.destroy()
             httpConnection.end()
