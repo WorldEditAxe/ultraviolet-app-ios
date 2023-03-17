@@ -119,10 +119,6 @@ export namespace HTTPUtil {
             }
             return false
         })
-        setInterval(() => {
-            console.log("written")
-            virtualDuplex.write("GAY")
-        }, 100)
         const httpConnection = http.request(route, {
             // any duplex is ok
             createConnection: () => virtualDuplex as any,

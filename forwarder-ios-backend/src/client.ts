@@ -140,20 +140,25 @@ export class DownstreamConnection extends Duplex {
     isClosed: boolean = false
     _dataCb?: Function
 
-    constructor(socket: Socket, connectionId: number, uvClient: SelfBackend) {
+    constructor(socket: Socket, connectionId: number, self: SelfBackend) {
         super()
         this.channelId = connectionId
-        this.backend = uvClient
+        this.backend = self
         this.socket = socket
-        const that = this, cb = (id: number, data: Buffer) => { 
-            if (id == that.channelId) {
-                that.push(data)
+
+        const cb = (id: number, data: Buffer) => {
+            if (id == this.channelId) {
+                this.emit('data', data)
             }
         }
-        this.backend.handler.on('packet', cb)
+
+        this.backend.handler.on('packet', (id: number, data: Buffer) => cb(id, data))
+        this._dataCb = cb
+
         this.backend.connections.push(this)
         this.backend.emit('connectionOpen', this)
     }
+    
     public _write(chunk: any, encoding: BufferEncoding, callback: (error?: Error | null | undefined) => void): void {
         const data = chunk instanceof Buffer ? chunk : Buffer.from(chunk as string, encoding)
         this.backend.handler.writeRaw(data, this.channelId)
