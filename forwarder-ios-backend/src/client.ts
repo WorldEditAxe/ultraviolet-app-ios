@@ -14,6 +14,7 @@ import SNewConnectionPacket from "./packets/ready/SNewConnectionPacket.js";
 import { Protocol } from "./protocol.js";
 import IPacket from "./IPacket.js";
 import { StreamWrapper } from "./stream_wrapper.js";
+import { CCAckConnectionOpenPacket } from "./packets/ready/CAckConnectionOpenPacket.js";
 
 const endPacketId = (new SConnectionEndPacket()).id
 const newConnectionPacketId = (new SNewConnectionPacket()).id
@@ -29,12 +30,9 @@ export class SelfBackend extends EventEmitter {
         super()
         this.socket = socket
         this.handler = handler
-        this.socket.pause()
         this.connections = []
-        ;(async () => {
-            await this._performHandshake()
-            this._bindListeners()
-        })()
+        this._performHandshake()
+            .then(() => this._bindListeners())
     }
 
     private _bindListeners() {
@@ -58,6 +56,7 @@ export class SelfBackend extends EventEmitter {
                         connection = this.connections.filter(c => c.channelId == cEndPacket.channelId!)[0]
                     this.emit('packet', cEndPacket)
                     if (connection) {
+                        logger.info(`[CONNECTION_END] Connection with ID ${cEndPacket.channelId} was closed.`)
                         connection.destroy()
                         this.connections = this.connections.splice(this.connections.indexOf(connection), 1)
                         this.emit('connectionEnd', connection)
@@ -71,7 +70,7 @@ export class SelfBackend extends EventEmitter {
                         host: config.serverIp,
                         port: config.serverPort
                     }, () => {
-                        logger.info(`[CONNECTION] New downstream connection from [/${newConP.ip}:${newConP.port}].`)
+                        logger.info(`[CONNECTION] New downstream connection from [/${newConP.ip}:${newConP.port}]. (ID: ${newConP.channelId})`)
                     }).once('error', () => {
                         downstreamCon.destroy()
                     })
@@ -80,7 +79,11 @@ export class SelfBackend extends EventEmitter {
                         console.log(d.toString())
                         socket.write(d)
                     })
-    
+                    
+                    const ack = new CCAckConnectionOpenPacket()
+                    ack.channelId = newConP.channelId!
+                    this.handler.writePacket(ack, 0)
+
                     socket.once('close', () => downstreamCon.destroy())
                     downstreamCon.once('close', () => downstreamCon.destroy())
                 }
@@ -135,42 +138,37 @@ export class DownstreamConnection extends Duplex {
     socket: Socket
     channelId: number
     isClosed: boolean = false
-    
+    _dataCb?: Function
+
     constructor(socket: Socket, connectionId: number, uvClient: SelfBackend) {
         super()
         this.channelId = connectionId
         this.backend = uvClient
         this.socket = socket
-        this._bindListeners()
+        const that = this, cb = (id: number, data: Buffer) => { 
+            if (id == that.channelId) {
+                that.push(data)
+            }
+        }
+        this.backend.handler.on('packet', cb)
         this.backend.connections.push(this)
         this.backend.emit('connectionOpen', this)
     }
-
-    private _bindListeners() {
-        this.backend.handler.on('packet', this._readCb)
-    }
-
-    private _readCb(id: number, data: Buffer) {
-        if (id == this.channelId) {
-            this.push(data)
-        }
-    }
-
     public _write(chunk: any, encoding: BufferEncoding, callback: (error?: Error | null | undefined) => void): void {
         const data = chunk instanceof Buffer ? chunk : Buffer.from(chunk as string, encoding)
         this.backend.handler.writeRaw(data, this.channelId)
         callback()
     }
 
-    public _read(size: number): void {
-        // data is already pushed to the read buffer via the listener
+    public _read(): void {
+        // handled by this._readCb
     }
 
     public _destroy(error: Error | null, callback: (error: Error | null) => void): void {
         const destroyPacket = new CConnectionEndPacket()
         destroyPacket.channelId = this.channelId
         this.backend.handler.writePacket(destroyPacket, 0)
-        this.backend.handler.removeListener("packet", this._readCb)
+        this.backend.handler.removeListener("packet", this._dataCb! as any)
         this.backend.connections = this.backend.connections.splice(this.backend.connections.indexOf(this), 1)
         this.isClosed = true
     }

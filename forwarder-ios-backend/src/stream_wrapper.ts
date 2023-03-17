@@ -31,7 +31,7 @@ export class StreamWrapper extends EventEmitter {
         ]))
     }
 
-    public readPacket(channelId: number, packetId?: number): Promise<[number, Buffer]> {
+    public readPacket(channelId: number, packetId?: number, isValid?: (pId: number, data: Buffer) => boolean): Promise<[number, Buffer]> {
         return new Promise<[number, Buffer]>((res, rej) => {
             const endCb = () => {
                 rej("Socket closed whilst waiting for data.")
@@ -39,9 +39,11 @@ export class StreamWrapper extends EventEmitter {
                 if (chan == channelId) {
                     const id = Protocol.readVarInt(data)
                     if (id.value == packetId || packetId == null) {
-                        this.removeListener('packet', packetCb)
-                        this.removeListener('end', endCb)
-                        res([id.value, id.newBuffer])
+                        if (isValid == null || isValid(chan, id.newBuffer)) {
+                            this.removeListener('packet', packetCb)
+                            this.removeListener('end', endCb)
+                            res([id.value, id.newBuffer])
+                        }
                     }
                 }
             }
@@ -75,7 +77,6 @@ export class StreamWrapper extends EventEmitter {
             }
         })
         this.socket.on('message', data => {
-            console.log(1)
             if (data instanceof Buffer == false) {
                 throw new TypeError("Non-buffer/binary data was sent via WebSocket.")
             } else {

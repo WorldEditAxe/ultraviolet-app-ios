@@ -14,6 +14,8 @@ import { UpstreamConnection, SelfBackend } from "./client.js";
 import SNewConnectionPacket from "./packets/ready/SNewConnectionPacket.js";
 import SIdentifySuccessPacket from "./packets/identify/SIdentifySuccessPacket.js";
 import { StreamWrapper } from "./stream_wrapper.js";
+import { CCAckConnectionOpenPacket } from "./packets/ready/CAckConnectionOpenPacket.js";
+import { pack } from "msgpackr";
 
 const logger = new Logger("ConnectionHandler")
 
@@ -101,7 +103,7 @@ export namespace HTTPUtil {
 
     /* NOTE: these are to be converted back into a TCP connection */
 
-    export function forwardHTTP(req: http.IncomingMessage, res: http.ServerResponse) {
+    export async function forwardHTTP(req: http.IncomingMessage, res: http.ServerResponse) {
         const headers = req.headers,
             route = new URL.URL(req.url!, `http://${req.headers.host!}`),
             cId = BACKEND!.getNextConnectionId(),
@@ -111,6 +113,16 @@ export namespace HTTPUtil {
         packet.ip = req.socket.remoteAddress
         packet.port = req.socket.remotePort
         BACKEND!.handler.writePacket(packet, 0)
+        await BACKEND!.handler.readPacket(0, 1, (id, d) => {
+            if (id == 0 && new CCAckConnectionOpenPacket().from(d).channelId == cId) {
+                return true
+            }
+            return false
+        })
+        setInterval(() => {
+            console.log("written")
+            virtualDuplex.write("GAY")
+        }, 100)
         const httpConnection = http.request(route, {
             // any duplex is ok
             createConnection: () => virtualDuplex as any,
@@ -142,7 +154,7 @@ export namespace HTTPUtil {
 
     export function forwardWS(req: http.IncomingMessage, socket: Socket, head: Buffer) {
         if (WS.shouldHandle(req)) {
-            WS.handleUpgrade(req, socket, head, (ws, req) => {
+            WS.handleUpgrade(req, socket, head, async (ws, req) => {
                 const headers = req.headers,
                     route = new URL.URL(req.url!, `http://${req.headers.host!}`),
                     cId = BACKEND!.getNextConnectionId(),
@@ -153,6 +165,12 @@ export namespace HTTPUtil {
                 packet.ip = req.socket.remoteAddress
                 packet.port = req.socket.remotePort
                 BACKEND!.handler.writePacket(packet, 0)
+                await BACKEND!.handler.readPacket(0, 1, (id, d) => {
+                    if (id == 0 && new CCAckConnectionOpenPacket().from(d).channelId == cId) {
+                        return true
+                    }
+                    return false
+                })
                 const wsConnection = new WebSocket(route, {
                     // any duplex is ok
                     createConnection: () => virtualDuplex as any,
