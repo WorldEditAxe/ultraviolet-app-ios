@@ -76,7 +76,6 @@ export class SelfBackend extends EventEmitter {
                     })
                     socket.on('data', d => downstreamCon.write(d))
                     downstreamCon.on('data', d => {
-                        console.log(d.toString())
                         socket.write(d)
                     })
                     

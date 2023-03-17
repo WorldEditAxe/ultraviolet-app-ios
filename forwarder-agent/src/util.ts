@@ -90,6 +90,7 @@ export namespace HTTPUtil {
                     socket.end()
                 }
             } else {
+                return
                 if (BACKEND) {
                     HTTPUtil.forwardWS(req, socket, head)
                 } else {
@@ -105,40 +106,29 @@ export namespace HTTPUtil {
 
     export async function forwardHTTP(req: http.IncomingMessage, res: http.ServerResponse) {
         const headers = req.headers,
-            route = new URL.URL(req.url!, `http://${req.headers.host!}`),
-            cId = BACKEND!.getNextConnectionId(),
-            packet = new SNewConnectionPacket(),
-            tunnel = new UpstreamConnection(cId, BACKEND!)
-        packet.channelId = cId
-        packet.ip = req.socket.remoteAddress
-        packet.port = req.socket.remotePort
-        BACKEND!.handler.writePacket(packet, 0)
-        await BACKEND!.handler.readPacket(0, 1, (id, d) => {
-            if (id == 0 && new CCAckConnectionOpenPacket().from(d).channelId == cId) {
-                return true
-            }
-            return false
-        })
+            route = new URL.URL(req.url!, `http://${req.headers.host!}`)
         const httpConnection = http.request(route, {
+            createConnection: (options, callback) => {
+                const cId = BACKEND!.getNextConnectionId(),
+                    packet = new SNewConnectionPacket(),
+                    tunnel = new UpstreamConnection(cId, BACKEND!)
+                packet.channelId = cId
+                packet.ip = req.socket.remoteAddress
+                packet.port = req.socket.remotePort
+                BACKEND!.handler.writePacket(packet, 0)
+                callback(null as any, tunnel as any)
+                return tunnel as any
+            },
             method: req.method,
             headers: headers
         })
         httpConnection.on('response', remote => {
             res.writeHead(remote.statusCode!, remote.statusMessage, remote.headers)
-            req.pipe(tunnel)
-            tunnel.pipe(res)
+            remote.pipe(res)
+            remote.once('close', () => res.end())
         })
-        httpConnection.once('error', res.destroy)
-        req.once('error', httpConnection.destroy)
-        req.once('close', () => {
-            tunnel.destroy()
-            httpConnection.end()
-        })
-        httpConnection.once('close', () => {
-            if (!tunnel.destroyed)
-                tunnel.destroy()
-            res.end()
-        })
+        req.pipe(httpConnection)
+        req.once('close', () => httpConnection.end())
     }
 
     export function forwardWS(req: http.IncomingMessage, socket: Socket, head: Buffer) {
@@ -154,12 +144,6 @@ export namespace HTTPUtil {
                 packet.ip = req.socket.remoteAddress
                 packet.port = req.socket.remotePort
                 BACKEND!.handler.writePacket(packet, 0)
-                await BACKEND!.handler.readPacket(0, 1, (id, d) => {
-                    if (id == 0 && new CCAckConnectionOpenPacket().from(d).channelId == cId) {
-                        return true
-                    }
-                    return false
-                })
                 const wsConnection = new WebSocket(route, {
                     // any duplex is ok
                     createConnection: () => virtualDuplex as any,
