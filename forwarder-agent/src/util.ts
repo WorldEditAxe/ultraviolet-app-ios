@@ -14,7 +14,7 @@ import { UpstreamConnection, RemoteBackend } from "./client.js";
 import SNewConnectionPacket from "./packets/ready/SNewConnectionPacket.js";
 import SIdentifySuccessPacket from "./packets/identify/SIdentifySuccessPacket.js";
 import { StreamWrapper } from "./stream_wrapper.js";
-import { CCAckConnectionOpenPacket } from "./packets/ready/CAckConnectionOpenPacket.js";
+import { CAckConnectionClosePacket } from "./packets/ready/CAckConnectionClosePacket.js";
 import { pack } from "msgpackr";
 
 const logger = new Logger("ConnectionHandler")

@@ -14,7 +14,7 @@ import SNewConnectionPacket from "./packets/ready/SNewConnectionPacket.js";
 import { Protocol } from "./protocol.js";
 import IPacket from "./IPacket.js";
 import { StreamWrapper } from "./stream_wrapper.js";
-import { CCAckConnectionOpenPacket } from "./packets/ready/CAckConnectionOpenPacket.js";
+import { CAckConnectionClosePacket } from "./packets/ready/CAckConnectionClosePacket.js";
 
 const endPacketId = (new SConnectionEndPacket()).id
 const newConnectionPacketId = (new SNewConnectionPacket()).id
@@ -78,10 +78,6 @@ export class SelfBackend extends EventEmitter {
                     downstreamCon.on('data', d => {
                         socket.write(d)
                     })
-                    
-                    const ack = new CCAckConnectionOpenPacket()
-                    ack.channelId = newConP.channelId!
-                    this.handler.writePacket(ack, 0)
 
                     socket.once('close', () => downstreamCon.destroy())
                     downstreamCon.once('close', () => downstreamCon.destroy())
@@ -175,6 +171,9 @@ export class DownstreamConnection extends Duplex {
         this.backend.handler.removeListener("packet", this._dataCb! as any)
         this.backend.connections = this.backend.connections.splice(this.backend.connections.indexOf(this), 1)
         this.isClosed = true
+        const packet = new CAckConnectionClosePacket()
+        packet.channelId = this.channelId
+        this.backend.handler.writePacket(packet, 0)
         if (callback) callback(error ?? null)
     }
 

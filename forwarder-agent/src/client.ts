@@ -10,6 +10,7 @@ import { Protocol } from "./protocol.js";
 import { StreamWrapper } from "./stream_wrapper.js";
 
 const endPacketId = (new CConnectionEndPacket()).id
+const a
 const logger = new Logger("ConnectionHandler")
 
 export class RemoteBackend extends EventEmitter {

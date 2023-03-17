@@ -1,7 +1,7 @@
 import IPacket from "../../IPacket.js";
 import { Protocol } from "../../protocol.js";
 
-export class CCAckConnectionOpenPacket implements IPacket {
+export class CAckConnectionClosePacket implements IPacket {
     id: number = 0x01
     boundTo: "CLIENT" | "SERVER" = "SERVER"
 
