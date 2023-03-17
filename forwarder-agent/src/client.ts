@@ -4,9 +4,7 @@ import { Socket } from "net";
 import { Duplex } from "stream";
 import { WebSocket } from "ws";
 import Logger from "./logger.js";
-import { CConnectionEndPacket } from "./packets/ready/CConnectionEndPacket.js";
 import { SConnectionEndPacket } from "./packets/ready/SConnectionEndPacket.js";
-import { Protocol } from "./protocol.js";
 import { StreamWrapper } from "./stream_wrapper.js";
 
 const endPacketId = (new SConnectionEndPacket()).id
@@ -106,11 +104,13 @@ export class UpstreamConnection extends Duplex {
     }
 
     private _bindListeners() {
-        this.backend.handler.on('packet', (id, data) => {
-            if (id == this.channelId) {
-                this.push(data)
-            }
-        })
+        this.backend.handler.on('packet', this._readCb)
+    }
+
+    private _readCb(id: number, data: Buffer) {
+        if (id == this.channelId) {
+            this.push(data)
+        }
     }
 
     public _write(chunk: any, encoding: BufferEncoding, callback: (error?: Error | null | undefined) => void): void {
@@ -127,6 +127,7 @@ export class UpstreamConnection extends Duplex {
         const destroyPacket = new SConnectionEndPacket()
         destroyPacket.channelId = this.channelId
         this.backend.handler.writePacket(destroyPacket, 0)
+        this.backend.handler.removeListener('packet', this._readCb)
         this.backend.connections = this.backend.connections.splice(this.backend.connections.indexOf(this), 1)
         this.backend.returnConnectionId(this.channelId)
         this.isClosed = true

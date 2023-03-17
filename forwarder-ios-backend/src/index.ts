@@ -2,6 +2,7 @@ import Logger from "./logger.js";
 import config from "./config.js"
 import { SelfBackend } from "./client.js";
 import { WebSocket } from "ws"
+import { StreamWrapper } from "./stream_wrapper.js";
 
 const logger = new Logger("Forwarder")
 let forwarder: SelfBackend
@@ -28,7 +29,8 @@ const ws = new WebSocket(`ws${config.agentSecure ? 's' : ''}://${config.agentIp}
 ws.once('error', closeListener)
 ws.on('open', () => {
     logger.info(`Connected to WebSocket backend, attempting to complete handshake...`)
-    forwarder = new SelfBackend(ws)
+    const handler = new StreamWrapper(ws)
+    forwarder = new SelfBackend(ws, handler)
     forwarder.once('ready', () => {
         logger.info(`Logged in! The backend forwarder is ready.`)
     })

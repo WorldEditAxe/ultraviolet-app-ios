@@ -75,6 +75,7 @@ export class StreamWrapper extends EventEmitter {
             }
         })
         this.socket.on('message', data => {
+            console.log(1)
             if (data instanceof Buffer == false) {
                 throw new TypeError("Non-buffer/binary data was sent via WebSocket.")
             } else {
