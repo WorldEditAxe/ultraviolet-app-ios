@@ -13,6 +13,7 @@ import SIdentifyFailurePacket, { IdentifyFailureReason } from "./packets/identif
 import { UpstreamConnection, SelfBackend } from "./client.js";
 import SNewConnectionPacket from "./packets/ready/SNewConnectionPacket.js";
 import SIdentifySuccessPacket from "./packets/identify/SIdentifySuccessPacket.js";
+import { StreamWrapper } from "./stream_wrapper.js";
 
 const logger = new Logger("ConnectionHandler")
 
@@ -59,15 +60,15 @@ export namespace HTTPUtil {
                                 WS.handleUpgrade(req, socket, head, ws => {
                                     res(ws)
                                 })
-                            })
-                            const Cidentify = new CIdentifyPacket().from((await Protocol.readPacket(ws, 0))[2])
+                            }), handler = new StreamWrapper(ws)
+                            const Cidentify = new CIdentifyPacket().from((await handler.readPacket(0, 0))[1])
                             if (Cidentify.protoVer! === PROTO_VERSION) {
                                 const Sidentify = new SIdentifySuccessPacket()
                                 Sidentify.branding = BRANDING
                                 Sidentify.protoVer = PROTO_VERSION
                                 Sidentify.url = `https://${CONFIG.bindIp}:${CONFIG.bindPort}/`
-                                Protocol.writePacket(ws, 0, Sidentify)
-                                const uvClient = new SelfBackend(ws)
+                                handler.writePacket(Sidentify, 0)
+                                const uvClient = new SelfBackend(ws, handler)
                                 global.BACKEND = uvClient
                                 logger.info(`Login Success! Client [/${socket.remoteAddress}:${socket.remotePort}] has successfully logged in as the upstream server.`)
                                 uvClient.emit('ready')
@@ -75,7 +76,7 @@ export namespace HTTPUtil {
                             } else {
                                 const SError = new SIdentifyFailurePacket()
                                 SError.reason = IdentifyFailureReason.BAD_VERSION
-                                Protocol.writePacket(ws, 0, SError)
+                                handler.writePacket(SError, 0)
                                 ws.close()
                                 resolved = true
                             }
@@ -109,7 +110,7 @@ export namespace HTTPUtil {
         packet.channelId = cId
         packet.ip = req.socket.remoteAddress
         packet.port = req.socket.remotePort
-        Protocol.writePacket(BACKEND!.socket, 0, packet)
+        BACKEND!.handler.writePacket(packet, 0)
         const httpConnection = http.request(route, {
             // any duplex is ok
             createConnection: () => virtualDuplex as any,
@@ -151,7 +152,7 @@ export namespace HTTPUtil {
                 packet.channelId = cId
                 packet.ip = req.socket.remoteAddress
                 packet.port = req.socket.remotePort
-                Protocol.writePacket(BACKEND!.socket, 0, packet)
+                BACKEND!.handler.writePacket(packet, 0)
                 const wsConnection = new WebSocket(route, {
                     // any duplex is ok
                     createConnection: () => virtualDuplex as any,

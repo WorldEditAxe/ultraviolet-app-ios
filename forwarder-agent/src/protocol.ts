@@ -343,17 +343,4 @@ export namespace Protocol {
             value: obj
         }
     }
-
-    export function writePacket(socket: WebSocket, connectionId: number, packet: IPacket) {
-        const body = Buffer.concat([Protocol.writeVarInt(connectionId), Protocol.writeVarInt(packet.id), packet.to()])
-        socket.send(Buffer.concat([
-            Protocol.writeVarInt(body.length),
-            body
-        ]))
-    }
-
-    export function writeRaw(socket: WebSocket, connectionId: number, data: Buffer) {
-        const body = Buffer.concat([Protocol.writeVarInt(connectionId), data])
-        socket.send(Buffer.concat([Protocol.writeVarInt(body.length), data]))
-    }
 }

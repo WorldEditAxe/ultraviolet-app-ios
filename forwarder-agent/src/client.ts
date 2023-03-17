@@ -7,61 +7,57 @@ import Logger from "./logger.js";
 import { CConnectionEndPacket } from "./packets/ready/CConnectionEndPacket.js";
 import { SConnectionEndPacket } from "./packets/ready/SConnectionEndPacket.js";
 import { Protocol } from "./protocol.js";
+import { StreamWrapper } from "./stream_wrapper.js";
 
 const endPacketId = (new SConnectionEndPacket()).id
 const logger = new Logger("ConnectionHandler")
 
 export class SelfBackend extends EventEmitter {
     socket: WebSocket
+    handler: StreamWrapper
     connections: UpstreamConnection[]
     state: ConnectionState = ConnectionState.CONNECTED
     freedConnectionIds: number[] = []
     nextConnectionId: number = 1
 
-    constructor(socket: WebSocket) {
+    constructor(socket: WebSocket, handler: StreamWrapper) {
         super()
         this.socket = socket
+        this.handler = handler
         this.connections = []
         this._bindListeners()
     }
 
     private _bindListeners() {
-        ;(async () => {
-            this.socket.once('close', () => {
-                logger.info("Upstream server disconnected from agent!")
-                this.state = ConnectionState.DISCONNECTED
-                this.connections.forEach(c => {
-                    if (!c.destroyed) {
-                        c.destroy()
-                        this.emit('connectionEnd', c)
-                    }
-                })
-                this.connections = []
-                this.freedConnectionIds = []
-                this.nextConnectionId = 1
-                this.emit('end')
-                global.BACKEND = null
+        this.handler.once('end', () => {
+            logger.info("Upstream server disconnected from agent!")
+            this.state = ConnectionState.DISCONNECTED
+            this.connections.forEach(c => {
+                if (!c.destroyed) {
+                    c.destroy()
+                    this.emit('connectionEnd', c)
+                }
             })
-            while (true) {
-                try {
-                    if (this.socket.readyState == this.socket.OPEN) {
-                        const packet = await Protocol.readPacket(this.socket, 0)
-                        if (packet[1] == endPacketId) {
-                            const cEndPacket = new SConnectionEndPacket().from(packet[2]),
-                                connection = this.connections.filter(c => c.connectionId == cEndPacket.channelId!)[0]
-                            if (connection) {
-                                connection.destroy()
-                                this.connections = this.connections.splice(this.connections.indexOf(connection), 1)
-                                this.returnConnectionId(connection.connectionId)
-                                this.emit('connectionEnd', connection)
-                            }
-                        }
-                    } else {
-                        break
+            this.connections = []
+            this.freedConnectionIds = []
+            this.nextConnectionId = 1
+            this.emit('end')
+            global.BACKEND = null
+        })
+        this.handler.on('packet', (id, data) => {
+            if (id == 0) {
+                if (data[0] == endPacketId) {
+                    const cEndPacket = new SConnectionEndPacket().from(data),
+                        connection = this.connections.filter(c => c.channelId == cEndPacket.channelId!)[0]
+                    if (connection) {
+                        connection.destroy()
+                        this.connections = this.connections.splice(this.connections.indexOf(connection), 1)
+                        this.returnConnectionId(connection.channelId)
+                        this.emit('connectionEnd', connection)
                     }
-                } catch { break }
+                }
             }
-        })()
+        })
     }
 
     getNextConnectionId(): number {
@@ -97,12 +93,12 @@ export declare interface SelfBackend {
 
 export class UpstreamConnection extends Duplex {
     backend: SelfBackend
-    connectionId: number
+    channelId: number
     isClosed: boolean = false
     
-    constructor(connectionId: number, uvClient: SelfBackend) {
+    constructor(channelId: number, uvClient: SelfBackend) {
         super()
-        this.connectionId = connectionId
+        this.channelId = channelId
         this.backend = uvClient
         this._bindListeners()
         this.backend.connections.push(this)
@@ -110,21 +106,16 @@ export class UpstreamConnection extends Duplex {
     }
 
     private _bindListeners() {
-        ;(async () => {
-            while (true) {
-                if (this.closed) {
-                    break
-                } else {
-                    const data = await Protocol.readChannelRaw(this.backend.socket, this.connectionId)
-                    this.push(data)
-                }
+        this.backend.handler.on('packet', (id, data) => {
+            if (id == this.channelId) {
+                this.push(data)
             }
-        })()
+        })
     }
 
     public _write(chunk: any, encoding: BufferEncoding, callback: (error?: Error | null | undefined) => void): void {
         const data = chunk instanceof Buffer ? chunk : Buffer.from(chunk as string, encoding)
-        Protocol.writeRaw(this.backend.socket, this.connectionId, data)
+        this.backend.handler.writeRaw(data, this.channelId)
         callback()
     }
 
@@ -134,10 +125,10 @@ export class UpstreamConnection extends Duplex {
 
     public _destroy(error: Error | null, callback: (error: Error | null) => void, ): void {
         const destroyPacket = new SConnectionEndPacket()
-        destroyPacket.channelId = this.connectionId
-        Protocol.writePacket(this.backend.socket, 0, destroyPacket)
+        destroyPacket.channelId = this.channelId
+        this.backend.handler.writePacket(destroyPacket, 0)
         this.backend.connections = this.backend.connections.splice(this.backend.connections.indexOf(this), 1)
-        this.backend.returnConnectionId(this.connectionId)
+        this.backend.returnConnectionId(this.channelId)
         this.isClosed = true
     }
 }
