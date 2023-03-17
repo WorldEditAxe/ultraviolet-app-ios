@@ -10,7 +10,7 @@ import { StreamWrapper } from "./stream_wrapper.js";
 const endPacketId = (new SConnectionEndPacket()).id
 const logger = new Logger("ConnectionHandler")
 
-export class SelfBackend extends EventEmitter {
+export class RemoteBackend extends EventEmitter {
     socket: WebSocket
     handler: StreamWrapper
     connections: UpstreamConnection[]
@@ -75,7 +75,7 @@ export class SelfBackend extends EventEmitter {
     }
 }
 
-export declare interface SelfBackend {
+export declare interface RemoteBackend {
     on(event: 'ready', listener: Function): this
     once(event: 'ready', listener: Function): this
 
@@ -90,46 +90,45 @@ export declare interface SelfBackend {
 }
 
 export class UpstreamConnection extends Duplex {
-    backend: SelfBackend
+    backend: RemoteBackend
     channelId: number
     isClosed: boolean = false
-    
-    constructor(channelId: number, uvClient: SelfBackend) {
+    _dataCb?: Function
+
+    constructor(connectionId: number, self: RemoteBackend) {
         super()
-        this.channelId = channelId
-        this.backend = uvClient
-        this._bindListeners()
+        this.channelId = connectionId
+        this.backend = self
+
+        const cb = (id: number, data: Buffer) => {
+            if (id == this.channelId) {
+                this.emit('data', data)
+            }
+        }
+
+        this.backend.handler.on('packet', (id: number, data: Buffer) => cb(id, data))
+        this._dataCb = cb
+
         this.backend.connections.push(this)
         this.backend.emit('connectionOpen', this)
     }
-
-    private _bindListeners() {
-        this.backend.handler.on('packet', this._readCb)
-    }
-
-    private _readCb(id: number, data: Buffer) {
-        if (id == this.channelId) {
-            this.push(data)
-        }
-    }
-
+    
     public _write(chunk: any, encoding: BufferEncoding, callback: (error?: Error | null | undefined) => void): void {
         const data = chunk instanceof Buffer ? chunk : Buffer.from(chunk as string, encoding)
         this.backend.handler.writeRaw(data, this.channelId)
         callback()
     }
 
-    public _read(size: number): void {
-        // data is already pushed to the read buffer via the listener
+    public _read(): void {
+        // handled by this._readCb
     }
 
-    public _destroy(error: Error | null, callback: (error: Error | null) => void, ): void {
+    public _destroy(error: Error | null, callback: (error: Error | null) => void): void {
         const destroyPacket = new SConnectionEndPacket()
         destroyPacket.channelId = this.channelId
         this.backend.handler.writePacket(destroyPacket, 0)
-        this.backend.handler.removeListener('packet', this._readCb)
+        this.backend.handler.removeListener("packet", this._dataCb! as any)
         this.backend.connections = this.backend.connections.splice(this.backend.connections.indexOf(this), 1)
-        this.backend.returnConnectionId(this.channelId)
         this.isClosed = true
     }
 }

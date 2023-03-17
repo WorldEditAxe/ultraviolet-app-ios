@@ -10,7 +10,7 @@ import CIdentifyPacket from "./packets/identify/CIdentifyPacket.js";
 import { Protocol } from "./protocol.js";
 import { BRANDING, PROTO_VERSION } from "./meta.js";
 import SIdentifyFailurePacket, { IdentifyFailureReason } from "./packets/identify/SIdentifyFailurePacket.js";
-import { UpstreamConnection, SelfBackend } from "./client.js";
+import { UpstreamConnection, RemoteBackend } from "./client.js";
 import SNewConnectionPacket from "./packets/ready/SNewConnectionPacket.js";
 import SIdentifySuccessPacket from "./packets/identify/SIdentifySuccessPacket.js";
 import { StreamWrapper } from "./stream_wrapper.js";
@@ -70,7 +70,7 @@ export namespace HTTPUtil {
                                 Sidentify.protoVer = PROTO_VERSION
                                 Sidentify.url = `https://${CONFIG.bindIp}:${CONFIG.bindPort}/`
                                 handler.writePacket(Sidentify, 0)
-                                const uvClient = new SelfBackend(ws, handler)
+                                const uvClient = new RemoteBackend(ws, handler)
                                 global.BACKEND = uvClient
                                 logger.info(`Login Success! Client [/${socket.remoteAddress}:${socket.remotePort}] has successfully logged in as the upstream server.`)
                                 uvClient.emit('ready')
@@ -108,7 +108,7 @@ export namespace HTTPUtil {
             route = new URL.URL(req.url!, `http://${req.headers.host!}`),
             cId = BACKEND!.getNextConnectionId(),
             packet = new SNewConnectionPacket(),
-            virtualDuplex = new UpstreamConnection(cId, BACKEND!)
+            tunnel = new UpstreamConnection(cId, BACKEND!)
         packet.channelId = cId
         packet.ip = req.socket.remoteAddress
         packet.port = req.socket.remotePort
@@ -120,30 +120,24 @@ export namespace HTTPUtil {
             return false
         })
         const httpConnection = http.request(route, {
-            // any duplex is ok
-            createConnection: () => virtualDuplex as any,
+            createConnection: () => tunnel as any,
             method: req.method,
             headers: headers
-        }, httpRes => {
-            res.writeHead(httpRes.statusCode!, httpRes.statusMessage, httpRes.headers)
-            req.on('data', d => httpConnection.write(d))
-            httpRes.on('data', d => {
-                res.write(d)
-            })
         })
-        httpConnection.once('error', () => {
-            res.end()
+        httpConnection.on('response', remote => {
+            res.writeHead(remote.statusCode!, remote.statusMessage, remote.headers)
+            req.pipe(tunnel)
+            tunnel.pipe(res)
         })
-        req.once('error', () => {
-            httpConnection.end()
-        })
+        httpConnection.once('error', res.end)
+        req.once('error', httpConnection.end)
         req.once('close', () => {
-            virtualDuplex.destroy()
+            tunnel.destroy()
             httpConnection.end()
         })
         httpConnection.once('close', () => {
-            if (!virtualDuplex.destroyed)
-                virtualDuplex.destroy()
+            if (!tunnel.destroyed)
+                tunnel.destroy()
             res.end()
         })
     }
