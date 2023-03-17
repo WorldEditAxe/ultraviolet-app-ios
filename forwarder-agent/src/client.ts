@@ -67,7 +67,11 @@ export class RemoteBackend extends EventEmitter {
     }
 
     getNextConnectionId(): number {
-        if (this.freedConnectionIds.length > 0) {
+        const ret = this.nextConnectionId
+        this.nextConnectionId++
+        return ret
+        /*
+                if (this.freedConnectionIds.length > 0) {
             const end = this.freedConnectionIds[0]
             this.freedConnectionIds = this.freedConnectionIds.splice(0, 1)
             return end
@@ -76,6 +80,7 @@ export class RemoteBackend extends EventEmitter {
             this.nextConnectionId++
             return ret
         }
+        */
     }
 
     private _returnConnectionId(cId: number) {
