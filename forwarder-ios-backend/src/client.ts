@@ -142,7 +142,7 @@ export class DownstreamConnection extends Duplex {
         this.socket = socket
 
         const cb = (id: number, data: Buffer) => {
-            if (id == this.channelId) {
+            if (id == this.channelId && !this.isClosed) {
                 this.emit('data', data)
             }
         }
@@ -155,9 +155,11 @@ export class DownstreamConnection extends Duplex {
     }
     
     public _write(chunk: any, encoding: BufferEncoding, callback: (error?: Error | null | undefined) => void): void {
-        const data = chunk instanceof Buffer ? chunk : Buffer.from(chunk as string, encoding)
-        this.backend.handler.writeRaw(data, this.channelId)
-        callback()
+        if (!this.isClosed) {
+            const data = chunk instanceof Buffer ? chunk : Buffer.from(chunk as string, encoding)
+            this.backend.handler.writeRaw(data, this.channelId)
+            callback()
+        }
     }
 
     public _read(): void {

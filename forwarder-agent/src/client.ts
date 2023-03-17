@@ -4,13 +4,14 @@ import { Socket } from "net";
 import { Duplex } from "stream";
 import { WebSocket } from "ws";
 import Logger from "./logger.js";
+import { CAckConnectionClosePacket } from "./packets/ready/CAckConnectionClosePacket.js";
 import { CConnectionEndPacket } from "./packets/ready/CConnectionEndPacket.js";
 import { SConnectionEndPacket } from "./packets/ready/SConnectionEndPacket.js";
 import { Protocol } from "./protocol.js";
 import { StreamWrapper } from "./stream_wrapper.js";
 
 const endPacketId = (new CConnectionEndPacket()).id
-const a
+const closeAck = (new CAckConnectionClosePacket()).id
 const logger = new Logger("ConnectionHandler")
 
 export class RemoteBackend extends EventEmitter {
@@ -54,9 +55,12 @@ export class RemoteBackend extends EventEmitter {
                     if (connection) {
                         connection.destroy()
                         this.connections = this.connections.splice(this.connections.indexOf(connection), 1)
-                        this.returnConnectionId(connection.channelId)
+                        this._returnConnectionId(connection.channelId)
                         this.emit('connectionEnd', connection)
                     }
+                } else if (pId.value == closeAck) {
+                    const cAck = new CAckConnectionClosePacket().from(pId.newBuffer)
+                    this._returnConnectionId(cAck.channelId!)
                 }
             }
         })
@@ -74,7 +78,7 @@ export class RemoteBackend extends EventEmitter {
         }
     }
 
-    returnConnectionId(cId: number) {
+    private _returnConnectionId(cId: number) {
         if (this.freedConnectionIds.filter(i => i == cId).length == 0) {
             this.freedConnectionIds.push(cId)
         } else {
