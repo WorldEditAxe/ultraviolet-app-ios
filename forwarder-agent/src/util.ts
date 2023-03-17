@@ -90,7 +90,6 @@ export namespace HTTPUtil {
                     socket.end()
                 }
             } else {
-                return
                 if (BACKEND) {
                     HTTPUtil.forwardWS(req, socket, head)
                 } else {
@@ -128,7 +127,6 @@ export namespace HTTPUtil {
             remote.once('close', () => res.end())
         })
         req.pipe(httpConnection)
-        req.once('close', () => httpConnection.end())
     }
 
     export function forwardWS(req: http.IncomingMessage, socket: Socket, head: Buffer) {

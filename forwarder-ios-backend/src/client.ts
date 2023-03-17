@@ -61,7 +61,7 @@ export class SelfBackend extends EventEmitter {
                         this.connections = this.connections.splice(this.connections.indexOf(connection), 1)
                         this.emit('connectionEnd', connection)
                     }
-                } else if (packet[0] == newConnectionPacketId) {
+                } else if (id.value == newConnectionPacketId) {
                     const newConP = new SNewConnectionPacket().from(id.newBuffer),
                         socket = new Socket(),
                         downstreamCon = new DownstreamConnection(socket, newConP.channelId!, this)
