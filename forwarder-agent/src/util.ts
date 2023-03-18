@@ -154,7 +154,7 @@ export namespace HTTPUtil {
         WS.handleUpgrade(req, socket, head, async (ws, req) => {
             const msgListener = (msg: any) => queuedMessages.push(msg)
             const agent = new http.Agent()
-            let queuedMessages: unknown[] = []
+            let queuedMessages: unknown[] = [], clientClosed = false
             ws.on('message', msgListener)
             ;(agent as any).createConnection = (options: http.RequestOptions, callback: (err: Error, socket: Duplex) => void) => {
                 const cId = BACKEND!.getNextConnectionId(),
@@ -183,6 +183,8 @@ export namespace HTTPUtil {
                 ws.removeListener('message', msgListener)
                 queuedMessages.forEach(d => wsConnection.send(d as any))
                 queuedMessages = []
+                if (clientClosed)
+                    wsConnection.close()
 
                 wsConnection.on('ping', data => {
                     ws.ping(data)
@@ -211,7 +213,12 @@ export namespace HTTPUtil {
                 ws.close(code)
             })
             ws.once('close', code => {
-                wsConnection.close(code)
+                if (wsConnection.readyState != wsConnection.OPEN) {
+                    // TODO: does this work?
+                    clientClosed = true
+                } else {
+                    wsConnection.close(code)
+                }
             })
         })
         } else {
