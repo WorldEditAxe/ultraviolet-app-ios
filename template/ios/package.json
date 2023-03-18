@@ -4,7 +4,7 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-      "test": "echo \"Error: no test specified\" && exit 1"
+      "start": "cd server && node launch.js"
     },
     "author": "",
     "license": "ISC",
@@ -18,6 +18,6 @@
       "varint": "^6.0.0",
       "ws": "^8.13.0"
     },
-    "type": "module"
+    "type": "commonjs"
   }
   

@@ -16,6 +16,9 @@
   "author": "",
   "license": "GPL-3.0-or-later",
   "dependencies": {
+    "@rollup/plugin-commonjs": "^24.0.1",
+    "@rollup/plugin-json": "^6.0.0",
+    "@rollup/plugin-node-resolve": "^15.0.1",
     "@titaniumnetwork-dev/ultraviolet": "^1.0.10",
     "@tomphttp/bare-server-node": "^1.2.5",
     "express": "^4.18.2",

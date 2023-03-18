@@ -25,6 +25,7 @@ const ws = new WebSocket(`ws${config.agentSecure ? 's' : ''}://${config.agentIp}
 }),
     closeListener = () => {
         logger.error(`Failed to connect to agent. Are you sure the agent program is running? Try again later.`)
+        process.exit(1)
     }
 ws.once('error', closeListener)
 ws.on('open', () => {
@@ -32,6 +33,6 @@ ws.on('open', () => {
     const handler = new StreamWrapper(ws)
     forwarder = new SelfBackend(ws, handler)
     forwarder.once('ready', () => {
-        logger.info(`Logged in! The backend forwarder is ready.`)
+        logger.info(`Logged in! The backend forwarder is ready. Access the server by heading to the agent server's server address.`)
     })
 })
