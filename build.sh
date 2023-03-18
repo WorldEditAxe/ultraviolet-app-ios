@@ -33,7 +33,7 @@ UV_DL=$(curl -s https://api.github.com/repos/titaniumnetwork-dev/Ultraviolet/rel
 cd "$SCRIPT_DIR/out/temp/script"
 wget "$UV_DL" -O download.tgz
 tar -xvf download.tgz
-cd package
+cd package/dist
 rm -rf *.map
 cp -r . "$SCRIPT_DIR/out/ios/public/uv"
 cd "$SCRIPT_DIR/ultraviolet"
