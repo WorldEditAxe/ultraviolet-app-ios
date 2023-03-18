@@ -16,6 +16,7 @@ import SIdentifySuccessPacket from "./packets/identify/SIdentifySuccessPacket.js
 import { StreamWrapper } from "./stream_wrapper.js";
 import { CAckConnectionClosePacket } from "./packets/ready/CAckConnectionClosePacket.js";
 import { pack } from "msgpackr";
+import { Duplex } from "stream";
 
 const logger = new Logger("ConnectionHandler")
 
@@ -131,26 +132,41 @@ export namespace HTTPUtil {
 
     export function forwardWS(req: http.IncomingMessage, socket: Socket, head: Buffer) {
         if (WS.shouldHandle(req)) {
-            WS.handleUpgrade(req, socket, head, async (ws, req) => {
-                const headers = req.headers,
-                    route = new URL.URL(req.url!, `http://${req.headers.host!}`)
-                const wsConnection = new WebSocket(route, {
-                    // any duplex is ok
-                    createConnection: (options, callback) => {
-                        const cId = BACKEND!.getNextConnectionId(),
-                            packet = new SNewConnectionPacket(),
-                            tunnel = new UpstreamConnection(cId, BACKEND!)
-                        packet.channelId = cId
-                        packet.ip = req.socket.remoteAddress
-                        packet.port = req.socket.remotePort
-                        BACKEND!.handler.writePacket(packet, 0)
-                        callback(null as any, tunnel as any)
-                        return tunnel as any
-                    },
-                    host: 'localhost',
-                    method: req.method,
-                    headers: headers
-                })
+            const headers = req.headers,
+            route = new URL.URL(req.url!, `http://${req.headers.host!}`)
+        route.protocol = "ws:"
+        WS.handleUpgrade(req, socket, head, async (ws, req) => {
+            const msgListener = (msg: any) => queuedMessages.push(msg)
+            const agent = new http.Agent()
+            let queuedMessages: unknown[] = []
+            ws.on('message', msgListener)
+            ;(agent as any).createConnection = (options: http.RequestOptions, callback: (err: Error, socket: Duplex) => void) => {
+                const cId = BACKEND!.getNextConnectionId(),
+                    packet = new SNewConnectionPacket(),
+                    tunnel = new UpstreamConnection(cId, BACKEND!)
+                packet.channelId = cId
+                packet.ip = req.socket.remoteAddress
+                packet.port = req.socket.remotePort
+                BACKEND!.handler.writePacket(packet, 0)
+
+                // polyfill
+                ;(tunnel as any).setTimeout = () => true
+                ;(tunnel as any).setNoDelay = () => true
+
+                callback(null as any, tunnel as any)
+                return tunnel as any
+            }
+
+            const wsConnection = new WebSocket(route, ws.protocol, {
+                agent: agent,
+                method: req.method,
+                headers: headers
+            })
+
+            wsConnection.on('open', () => {
+                ws.removeListener('message', msgListener)
+                queuedMessages.forEach(d => wsConnection.send(d as any))
+                queuedMessages = []
 
                 wsConnection.on('ping', data => {
                     ws.ping(data)
@@ -164,20 +180,24 @@ export namespace HTTPUtil {
                 ws.on('pong', data => {
                     wsConnection.pong(data)
                 })
-                wsConnection.on('message', data => {
-                    ws.send(data)
+                wsConnection.on('message', (data, isBinary) => {
+                    ws.send(data, {
+                        binary: isBinary
+                    })
                 })
-                ws.on('message', data => {
-                    wsConnection.send(data)
-                })
-
-                wsConnection.once('close', (code) => {
-                    ws.close(code)
-                })
-                ws.once('close', code => {
-                    wsConnection.close(code)
+                ws.on('message', (data, isBinary) => {
+                    wsConnection.send(data, {
+                        binary: isBinary
+                    })
                 })
             })
+            wsConnection.once('close', (code) => {
+                ws.close(code)
+            })
+            ws.once('close', code => {
+                wsConnection.close(code)
+            })
+        })
         } else {
             socket.end()
         }
