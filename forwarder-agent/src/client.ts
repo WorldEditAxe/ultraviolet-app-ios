@@ -67,7 +67,6 @@ export class RemoteBackend extends EventEmitter {
     }
 
     getNextConnectionId(): number {
-        console.log(this.freedConnectionIds)
         if (this.freedConnectionIds.length > 0) {
             const end = this.freedConnectionIds[0]
             this.freedConnectionIds.splice(0, 1)

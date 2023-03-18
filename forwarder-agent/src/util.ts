@@ -126,8 +126,24 @@ export namespace HTTPUtil {
             res.writeHead(remote.statusCode!, remote.statusMessage, remote.headers)
             remote.pipe(res)
             remote.once('close', () => res.end())
+            res.once('close', () => res.end())
         })
+        let isEnded = false
         req.pipe(httpConnection)
+        res.once('close', () => {
+            if (isEnded) return
+            isEnded = true
+            if (httpConnection.socket) {
+                httpConnection.socket!.end()
+            } else {
+                httpConnection.destroy()
+            }
+        })
+        httpConnection.once('close', () => {
+            if (isEnded) return
+            isEnded = true
+            req.socket!.end()
+        })
     }
 
     export function forwardWS(req: http.IncomingMessage, socket: Socket, head: Buffer) {
