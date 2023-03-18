@@ -2,7 +2,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 echo "--- Starting ultraviolet-app-ios build ---"
 echo "Have you configured the config files forwarder-agent/src/config.ts and forwarder-ios-backend/src/config.ts? [enter = yes, ctrl + c = no]"
 read -p "> "
-echo "--- Building Utilities ---"
+echo "--- Installing Build Utilities ---"
 echo "Installing required build npm modules..."
 npm i -g typescript babel-minify rollup
 echo "--- Downloading Proxy ---"
@@ -41,9 +41,16 @@ npm i "@rollup/plugin-commonjs" "@rollup/plugin-json" "@rollup/plugin-node-resol
 cd src
 cp "$SCRIPT_DIR/out/rollup.config.js" "."
 npx rollup --config ./rollup.config.js --bundleConfigAsCjs
-cp uv.js "$SCRIPT_DIR/out/ios/server"
+
+mv uv.js uv.ts
+cp "$SCRIPT_DIR/out/tsconfig.json" "."
+tsc
+cd out
+sed -i "s/node://" "uv.js"
+cp uv.js "$SCRIPT_DIR/out/ios/server/"
+
 echo "--> Forwarder Agent"
-cd "$SCRIPT_DIR/forwarder-agent/build"
+cd "$SCRIPT_DIR/forwarder-agent/"
 tsc
 cp -r "$SCRIPT_DIR/forwarder-agent/build/." "$SCRIPT_DIR/out/agent"
 echo "--> Forwarder iOS Backend"
@@ -54,7 +61,13 @@ cd "build"
 cp "$SCRIPT_DIR/out/rollup.config.js" "."
 sed -i "s/uv.js/forwarder.js/" "rollup.config.js"
 npx rollup --config ./rollup.config.js --bundleConfigAsCjs
-cp forwarder.js "$SCRIPT_DIR/out/ios/server"
+
+mv forwarder.js forwarder.ts
+cp "$SCRIPT_DIR/out/tsconfig.json" "."
+tsc
+cd out
+cp forwarder.js "$SCRIPT_DIR/out/ios/server/"
+
 echo "--- Create .zip Files ---"
 echo "-> Agent Server Files"
 cd "$SCRIPT_DIR/out"

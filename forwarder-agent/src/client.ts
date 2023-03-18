@@ -117,7 +117,7 @@ export class UpstreamConnection extends Duplex {
             }
         }
 
-        this.backend.handler.on('packet', (id: number, data: Buffer) => cb(id, data))
+        this.backend.handler.on('packet', cb.bind(this))
         this._dataCb = cb
 
         this.backend.connections.push(this)

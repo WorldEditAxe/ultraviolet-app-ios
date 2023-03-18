@@ -5,10 +5,10 @@ export default {
     serverPort: 8080, 
 
     // ip + port for the agent
-    agentSecure: false,
-    agentIp: "127.0.0.1",
-    agentPort: 4443,
+    agentSecure: true,
+    agentIp: "BonyIndolentBlogs.worldeditaxe.repl.co",
+    agentPort: 443,
     
     // password must be same as set on server
-    password: null
+    password: "testing password 123"
 }

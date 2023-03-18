@@ -79,8 +79,8 @@ export class SelfBackend extends EventEmitter {
                         socket.write(d)
                     })
 
-                    socket.once('close', () => downstreamCon.destroy())
-                    downstreamCon.once('close', () => downstreamCon.destroy())
+                    socket.once('close', () => downstreamCon.end())
+                    downstreamCon.once('close', () => socket.end())
                 }
             }
         })
@@ -147,7 +147,7 @@ export class DownstreamConnection extends Duplex {
             }
         }
 
-        this.backend.handler.on('packet', (id: number, data: Buffer) => cb(id, data))
+        this.backend.handler.on('packet', cb.bind(this))
         this._dataCb = cb
 
         this.backend.connections.push(this)
@@ -170,8 +170,11 @@ export class DownstreamConnection extends Duplex {
         const destroyPacket = new CConnectionEndPacket()
         destroyPacket.channelId = this.channelId
         this.backend.handler.writePacket(destroyPacket, 0)
+
+        // FIX: event listener leak here
         this.backend.handler.removeListener("packet", this._dataCb! as any)
-        this.backend.connections = this.backend.connections.splice(this.backend.connections.indexOf(this), 1)
+        this.backend.connections.splice(this.backend.connections.indexOf(this), 1)
+
         this.isClosed = true
         const packet = new CAckConnectionClosePacket()
         packet.channelId = this.channelId
@@ -186,7 +189,7 @@ export class DownstreamConnection extends Duplex {
         if (chunk != null) {
             this.write(chunk, encoding as any)
         }
-        // this._destroy(null)
+        this._destroy(null)
         if (cb != null) (cb as Function)()
         return this
     }

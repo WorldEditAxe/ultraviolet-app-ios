@@ -3,6 +3,7 @@ import config from "./config.js"
 import { SelfBackend } from "./client.js";
 import { WebSocket } from "ws"
 import { StreamWrapper } from "./stream_wrapper.js";
+process.env.PORT = config.serverPort.toString()
 
 const logger = new Logger("Forwarder")
 let forwarder: SelfBackend
@@ -11,6 +12,9 @@ logger.info("Starting Forwarder iOS Backend...")
 logger.info("<--- CONFIG --->")
 logger.info(`-> Server IP: ${config.serverIp}`)
 logger.info(`-> Server Port: ${config.serverPort}`)
+logger.info(`-> Agent IP: ${config.agentIp}`)
+logger.info(`-> Agent Port: ${config.agentPort}`)
+logger.info(`-> Is Connection Secure: ${config.agentSecure ? "Yes" : "No"}`)
 logger.info(`-> Password: ${config.password ? (config.password as string).replaceAll(/(.*?)/gmi, "*") : "<none set>"}`)
 logger.info("<--- CONFIG --->")
 if (!config.password) {

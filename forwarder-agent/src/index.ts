@@ -13,7 +13,7 @@ logger.info("Starting Forwarder...")
 logger.info("<--- CONFIG --->")
 logger.info(`-> Bind IP: ${config.bindIp}`)
 logger.info(`-> Bind Port: ${config.bindPort}`)
-logger.info(`-> Password: ${config.password ? (config.password as string).replaceAll(/(.*?)/gmi, "*") : "<none set>"}`)
+logger.info(`-> Password: ${config.password ? "*".repeat((config.password as string).length) : "<none set>"}`)
 logger.info(`-> TLS/HTTPS: ${config.tls.key || config.tls.cert ? "Enabled" : "Disabled"}`)
 logger.info("<--- CONFIG --->")
 if (!config.password) {
