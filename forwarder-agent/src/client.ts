@@ -67,27 +67,22 @@ export class RemoteBackend extends EventEmitter {
     }
 
     getNextConnectionId(): number {
-        const ret = this.nextConnectionId
-        this.nextConnectionId++
-        return ret
-        /*
-                if (this.freedConnectionIds.length > 0) {
+        console.log(this.freedConnectionIds)
+        if (this.freedConnectionIds.length > 0) {
             const end = this.freedConnectionIds[0]
-            this.freedConnectionIds = this.freedConnectionIds.splice(0, 1)
+            this.freedConnectionIds.splice(0, 1)
+            this.freedConnectionIds
             return end
         } else {
             const ret = this.nextConnectionId
             this.nextConnectionId++
             return ret
         }
-        */
     }
 
     private _returnConnectionId(cId: number) {
         if (this.freedConnectionIds.filter(i => i == cId).length == 0) {
             this.freedConnectionIds.push(cId)
-        } else {
-            logger.warn("returnConnectionId is attempting to return a channel ID already in array!?")
         }
     }
 }
