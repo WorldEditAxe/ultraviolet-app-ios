@@ -30,12 +30,12 @@ git clone https://github.com/titaniumnetwork-dev/Ultraviolet-Static .
 cp -r public/. "$SCRIPT_DIR/out/ios/public"
 echo "---> Downloading prebuilt Ultraviolet script files..."
 UV_DL=$(curl -s https://api.github.com/repos/titaniumnetwork-dev/Ultraviolet/releases/latest | grep browser_download_url | cut -d '"' -f 4)
-UV_FN=$(curl -s https://api.github.com/repos/titaniumnetwork-dev/Ultraviolet/releases/latest | jq ".assets[0].name")
-cd "$SCRIPT_DIR/out/temp/static"
-wget "$UV_DL"
-
-# TODO: download & move script files
-
+cd "$SCRIPT_DIR/out/temp/script"
+wget "$UV_DL" -O download.tgz
+tar -xvf download.tgz
+cd package
+rm -rf *.map
+cp -r . "$SCRIPT_DIR/out/ios/public/uv"
 cd "$SCRIPT_DIR/ultraviolet"
 npm i "@rollup/plugin-commonjs" "@rollup/plugin-json" "@rollup/plugin-node-resolve"
 cd src
@@ -55,3 +55,11 @@ cp "$SCRIPT_DIR/out/rollup.config.js" "."
 sed -i "s/uv.js/forwarder.js/" "rollup.config.js"
 npx rollup --config ./rollup.config.js --bundleConfigAsCjs
 cp forwarder.js "$SCRIPT_DIR/out/ios/server"
+echo "--- Create .zip Files ---"
+echo "-> Agent Server Files"
+cd "$SCRIPT_DIR/out"
+zip -r agent.zip agent
+echo "-> iOS Backend Files"
+zip -r ios.zip ios
+echo "--- Completed Build ---"
+echo "Build Success! .zip archives (agent.zip, ios.zip) are available in the out folder."
