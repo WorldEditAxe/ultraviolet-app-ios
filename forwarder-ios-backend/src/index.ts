@@ -15,7 +15,7 @@ logger.info(`-> Server Port: ${config.serverPort}`)
 logger.info(`-> Agent IP: ${config.agentIp}`)
 logger.info(`-> Agent Port: ${config.agentPort}`)
 logger.info(`-> Is Connection Secure: ${config.agentSecure ? "Yes" : "No"}`)
-logger.info(`-> Password: ${config.password ? (config.password as string).replaceAll(/(.*?)/gmi, "*") : "<none set>"}`)
+logger.info(`-> Password: ${config.password ? "<redacted>" : "<none set>"}`)
 logger.info("<--- CONFIG --->")
 if (!config.password) {
     logger.warn("You don't have a password set! This is a security risk, please configure your server to utilize a password.")

@@ -106,27 +106,32 @@ export namespace HTTPUtil {
 
     export async function forwardHTTP(req: http.IncomingMessage, res: http.ServerResponse) {
         const headers = req.headers,
-            route = new URL.URL(req.url!, `http://${req.headers.host!}`)
+            route = new URL.URL(req.url!, `http://${req.headers.host!}`),
+            agent = new http.Agent()
+        ;(agent as any).createConnection = (options: http.RequestOptions, callback: (err: Error, socket: Duplex) => void) => {
+            const cId = BACKEND!.getNextConnectionId(),
+                packet = new SNewConnectionPacket(),
+                tunnel = new UpstreamConnection(cId, BACKEND!)
+            packet.channelId = cId
+            packet.ip = req.socket.remoteAddress
+            packet.port = req.socket.remotePort
+            BACKEND!.handler.writePacket(packet, 0)
+
+            // polyfill
+            ;(tunnel as any).setTimeout = () => true
+            ;(tunnel as any).setNoDelay = () => true
+
+            callback(null as any, tunnel as any)
+            return tunnel as any
+        }
         const httpConnection = http.request(route, {
-            createConnection: (options, callback) => {
-                const cId = BACKEND!.getNextConnectionId(),
-                    packet = new SNewConnectionPacket(),
-                    tunnel = new UpstreamConnection(cId, BACKEND!)
-                packet.channelId = cId
-                packet.ip = req.socket.remoteAddress
-                packet.port = req.socket.remotePort
-                BACKEND!.handler.writePacket(packet, 0)
-                callback(null as any, tunnel as any)
-                return tunnel as any
-            },
+            agent: agent,
             method: req.method,
             headers: headers
         })
         httpConnection.on('response', remote => {
             res.writeHead(remote.statusCode!, remote.statusMessage, remote.headers)
             remote.pipe(res)
-            remote.once('close', () => res.end())
-            res.once('close', () => res.end())
         })
         let isEnded = false
         req.pipe(httpConnection)
