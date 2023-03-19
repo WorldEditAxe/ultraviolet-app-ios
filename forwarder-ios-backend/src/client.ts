@@ -58,7 +58,7 @@ export class SelfBackend extends EventEmitter {
                     if (connection) {
                         logger.info(`[CONNECTION_END] Connection with ID ${cEndPacket.channelId} was closed.`)
                         connection.destroy()
-                        this.connections = this.connections.splice(this.connections.indexOf(connection), 1)
+                        this.connections.splice(this.connections.indexOf(connection), 1)
                         this.emit('connectionEnd', connection)
                     }
                 } else if (id.value == newConnectionPacketId) {

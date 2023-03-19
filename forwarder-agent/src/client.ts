@@ -139,7 +139,7 @@ export class UpstreamConnection extends Duplex {
         destroyPacket.channelId = this.channelId
         this.backend.handler.writePacket(destroyPacket, 0)
         this.backend.handler.removeListener("packet", this._dataCb! as any)
-        this.backend.connections = this.backend.connections.splice(this.backend.connections.indexOf(this), 1)
+        this.backend.connections.splice(this.backend.connections.indexOf(this), 1)
         this.isClosed = true
         if (callback) callback(error ?? null)
     }
