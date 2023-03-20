@@ -56,7 +56,7 @@ export class SelfBackend extends EventEmitter {
                         connection = this.connections.filter(c => c.channelId == cEndPacket.channelId!)[0]
                     this.emit('packet', cEndPacket)
                     if (connection) {
-                        logger.info(`[CONNECTION_END] Connection with ID ${cEndPacket.channelId} was closed.`)
+                        logger.info(`[CONNECTION_END] Connection with ID ${cEndPacket.channelId} was closed by the agent.`)
                         connection.destroy()
                         this.connections.splice(this.connections.indexOf(connection), 1)
                         this.emit('connectionEnd', connection)
@@ -71,7 +71,8 @@ export class SelfBackend extends EventEmitter {
                         port: config.serverPort
                     }, () => {
                         logger.info(`[CONNECTION] New downstream connection from [/${newConP.ip}:${newConP.port}]. (ID: ${newConP.channelId})`)
-                    }).once('error', () => {
+                    }).once('error', (err) => {
+                        logger.warn(`An error has occurred whilst forwarding connection (ID: ${downstreamCon.channelId}): ${err.stack || err}`)
                         downstreamCon.destroy()
                     })
                     socket.on('data', d => downstreamCon.write(d))
@@ -79,8 +80,8 @@ export class SelfBackend extends EventEmitter {
                         socket.write(d)
                     })
 
-                    socket.once('close', () => downstreamCon.end())
-                    downstreamCon.once('close', () => socket.end())
+                    socket.once('close', () => downstreamCon.destroy())
+                    downstreamCon.once('close', () => socket.destroy())
                 }
             }
         })
@@ -180,18 +181,6 @@ export class DownstreamConnection extends Duplex {
         packet.channelId = this.channelId
         this.backend.handler.writePacket(packet, 0)
         if (callback) callback(error ?? null)
-    }
-
-    public end(cb?: (() => void) | undefined): this;
-    public end(chunk: any, cb?: (() => void) | undefined): this;
-    public end(chunk: any, encoding?: BufferEncoding | undefined, cb?: (() => void) | undefined): this;
-    public end(chunk?: unknown, encoding?: unknown, cb?: unknown): this {
-        if (chunk != null) {
-            this.write(chunk, encoding as any)
-        }
-        this._destroy(null)
-        if (cb != null) (cb as Function)()
-        return this
     }
 }
 
