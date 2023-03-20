@@ -129,6 +129,15 @@ export namespace HTTPUtil {
             method: req.method,
             headers: headers
         })
+        httpConnection.on('error', err => {
+            logger.warn(`HTTP connection (upstream) raised an error!\n${err.stack || err}`)
+        })
+        req.on('error', err => {
+            logger.warn(`HTTP connection (downstream, request) raised an error!\n${err.stack || err}`)
+        })
+        req.on('error', err => {
+            logger.warn(`HTTP connection (downstream, response) raised an error!\n${err.stack || err}`)
+        })
         httpConnection.on('response', remote => {
             res.writeHead(remote.statusCode!, remote.statusMessage, remote.headers)
             remote.pipe(res)
@@ -183,6 +192,12 @@ export namespace HTTPUtil {
                 method: req.method,
                 headers: headers
             })
+            wsConnection.on('error', err => {
+                logger.warn(`WebSocket (upstream) raised an error!\n${err.stack || err}`)
+            })
+            ws.on('error', err => {
+                logger.warn(`WebSocket (downstream) raised an error!\n${err.stack || err}`)
+            })
 
             wsConnection.on('open', () => {
                 ws.removeListener('message', msgListener)
@@ -190,7 +205,6 @@ export namespace HTTPUtil {
                 queuedMessages = []
                 if (clientClosed)
                     wsConnection.close()
-
                 wsConnection.on('ping', data => {
                     ws.ping(data)
                 })

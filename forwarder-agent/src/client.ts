@@ -117,9 +117,7 @@ export class UpstreamConnection extends Duplex {
             }
         }
 
-        this.backend.handler.on('packet', cb.bind(this))
-        this._dataCb = cb
-
+        this.backend.handler.on('packet', this._dataCb = cb.bind(this))
         this.backend.connections.push(this)
         this.backend.emit('connectionOpen', this)
     }
