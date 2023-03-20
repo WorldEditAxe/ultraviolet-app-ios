@@ -44,6 +44,7 @@ npx rollup --config ./rollup.config.js --bundleConfigAsCjs
 
 mv uv.js uv.ts
 cp "$SCRIPT_DIR/out/tsconfig.json" "."
+echo "Using TypeScript to convert JavaScript to ES5, this might take a while! Console may be flooded with TypeScript compilation errors, but ignore them."
 tsc
 cd out
 sed -i "s/node://" "uv.js"
@@ -64,6 +65,7 @@ npx rollup --config ./rollup.config.js --bundleConfigAsCjs
 
 mv forwarder.js forwarder.ts
 cp "$SCRIPT_DIR/out/tsconfig.json" "."
+echo "Using TypeScript to convert JavaScript to ES5, this might take a while! Console may be flooded with TypeScript compilation errors, but ignore them."
 tsc
 cd out
 cp forwarder.js "$SCRIPT_DIR/out/ios/server/"
