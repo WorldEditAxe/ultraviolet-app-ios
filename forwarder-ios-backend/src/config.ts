@@ -6,7 +6,7 @@ export default {
 
     // ip + port for the agent
     agentSecure: true,
-    agentIp: "RapidNotedSpreadsheets.worldeditaxe.repl.co",
+    agentIp: "FormalImpressionableNamebinding.worldeditaxe.repl.co",
     agentPort: 443,
     
     // password must be same as set on server
