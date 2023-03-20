@@ -144,6 +144,7 @@ export class UpstreamConnection extends Duplex {
         if (callback) callback(error ?? null)
     }
 
+    /*
     public end(cb?: (() => void) | undefined): this;
     public end(chunk: any, cb?: (() => void) | undefined): this;
     public end(chunk: any, encoding?: BufferEncoding | undefined, cb?: (() => void) | undefined): this;
@@ -155,6 +156,7 @@ export class UpstreamConnection extends Duplex {
         if (cb != null) (cb as Function)()
         return this
     }
+    */
 }
 
 export enum ConnectionState {
