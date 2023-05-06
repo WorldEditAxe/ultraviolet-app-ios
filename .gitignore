@@ -3,3 +3,5 @@ node_modules
 build
 out
 ultraviolet
+forwarder-ios-backend/package
+forwarder-ios-backend/download.tgz

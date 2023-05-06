@@ -26,11 +26,13 @@ cp -r "$SCRIPT_DIR/template/." "$SCRIPT_DIR/out"
 echo "--> Proxy"
 echo "---> Downloading Ultraviolet static site files..."
 cd "$SCRIPT_DIR/out/temp/static"
+rm -rf ./*
 git clone https://github.com/titaniumnetwork-dev/Ultraviolet-Static .
 cp -r public/. "$SCRIPT_DIR/out/ios/public"
 echo "---> Downloading prebuilt Ultraviolet script files..."
 UV_DL=$(curl -s https://api.github.com/repos/titaniumnetwork-dev/Ultraviolet/releases/latest | grep browser_download_url | cut -d '"' -f 4)
 cd "$SCRIPT_DIR/out/temp/script"
+rm -rf ./*
 wget "$UV_DL" -O download.tgz
 tar -xvf download.tgz
 cd package/dist
